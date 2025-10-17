@@ -1,0 +1,354 @@
+/* 中国风配色方案 */
+:root {
+  --primary-red: #c8102e; /* 中国红 */
+  --deep-red: #8b0000; /* 深红 */
+  --golden: #d4af37; /* 金色 */
+  --golden-yellow: #ffd700; /* 金黄色 */
+  --dark-gold: #b8860b; /* 暗金 */
+  --red-gradient: linear-gradient(135deg, #c8102e 0%, #8b0000 50%, #660000 100%);
+  --gold-gradient: linear-gradient(135deg, #ffd700 0%, #d4af37 100%);
+  --dragon-pattern: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l5 15h15l-12 9 5 15-13-9-13 9 5-15-12-9h15z' fill='%23ffffff' fill-opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* 全局样式重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  font-family: 'KaiTi', '楷体', 'STKaiti', '华文楷体', 'FangSong', '仿宋', 
+    'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(to bottom, #fff5f5 0%, #ffffff 100%);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 清除浮动 */
+.clearfix::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+
+/* 文本溢出省略 */
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-ellipsis-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.text-ellipsis-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 通用容器 */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* 卡片样式 - 中国风 */
+.card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(200, 16, 46, 0.12);
+  padding: 20px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gold-gradient);
+}
+
+.card:hover {
+  box-shadow: 0 8px 32px rgba(200, 16, 46, 0.2);
+  transform: translateY(-4px);
+  border-color: var(--golden);
+}
+
+/* 页面标题 - 中国风 */
+.page-title {
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--primary-red);
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 4px solid var(--golden);
+  display: inline-block;
+  position: relative;
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 4px rgba(200, 16, 46, 0.1);
+}
+
+.page-title::after {
+  content: '龍';
+  position: absolute;
+  right: -50px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 40px;
+  color: var(--golden);
+  opacity: 0.3;
+}
+
+/* 加载动画 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+}
+
+.empty-state-icon {
+  font-size: 64px;
+  color: #ddd;
+  margin-bottom: 16px;
+}
+
+.empty-state-text {
+  font-size: 16px;
+  color: #999;
+}
+
+/* 按钮样式增强 - 中国风 */
+.btn-primary {
+  background: var(--red-gradient);
+  border: 2px solid var(--golden);
+  color: white;
+  padding: 12px 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(200, 16, 46, 0.3);
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.btn-primary:hover::before {
+  left: 100%;
+}
+
+.btn-primary:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 6px 20px rgba(200, 16, 46, 0.4);
+  border-color: var(--golden-yellow);
+}
+
+/* 渐变背景 - 中国风 */
+.gradient-bg {
+  background: linear-gradient(135deg, #c8102e 0%, #8b0000 50%, #660000 100%);
+  position: relative;
+}
+
+.gradient-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--dragon-pattern);
+  opacity: 0.5;
+}
+
+.gradient-bg-red {
+  background: var(--red-gradient);
+  box-shadow: inset 0 0 50px rgba(255, 215, 0, 0.1);
+}
+
+.gradient-bg-blue {
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+}
+
+.gradient-bg-gold {
+  background: var(--gold-gradient);
+  color: var(--deep-red);
+}
+
+/* 标签样式 - 中国风 */
+.tag {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: bold;
+  margin: 4px;
+  border: 2px solid;
+  letter-spacing: 1px;
+}
+
+.tag-red {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+  color: var(--primary-red);
+  border-color: var(--primary-red);
+}
+
+.tag-blue {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  color: #1565c0;
+  border-color: #1565c0;
+}
+
+.tag-green {
+  background: linear-gradient(135deg, #f1f8e9 0%, #dcedc8 100%);
+  color: #558b2f;
+  border-color: #558b2f;
+}
+
+.tag-gold {
+  background: var(--gold-gradient);
+  color: var(--deep-red);
+  border-color: var(--dark-gold);
+}
+
+/* 响应式工具类 */
+/* 中国风装饰元素 */
+.dragon-decoration {
+  position: relative;
+}
+
+.dragon-decoration::before {
+  content: '龍';
+  position: absolute;
+  font-size: 120px;
+  color: var(--golden);
+  opacity: 0.05;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  font-weight: bold;
+}
+
+.chinese-border {
+  border: 3px solid var(--golden);
+  border-image: linear-gradient(45deg, var(--primary-red), var(--golden), var(--primary-red)) 1;
+  position: relative;
+}
+
+.chinese-border::before,
+.chinese-border::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--golden);
+}
+
+.chinese-border::before {
+  top: -3px;
+  left: -3px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.chinese-border::after {
+  bottom: -3px;
+  right: -3px;
+  border-left: none;
+  border-top: none;
+}
+
+.auspicious-cloud {
+  position: relative;
+  overflow: hidden;
+}
+
+.auspicious-cloud::before {
+  content: '☁';
+  position: absolute;
+  font-size: 60px;
+  color: var(--golden);
+  opacity: 0.08;
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-20px) translateX(10px); }
+}
+
+/* 响应式工具类 */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .page-title::after {
+    font-size: 30px;
+    right: -40px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+}
+

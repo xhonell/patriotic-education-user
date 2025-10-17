@@ -1,0 +1,372 @@
+/* 中国风主题样式 - 龙元素装饰 */
+
+/* Element Plus 组件主题覆盖 */
+:root {
+  --el-color-primary: #c8102e;
+  --el-color-primary-light-3: #e74c3c;
+  --el-color-primary-light-5: #ff6b6b;
+  --el-color-primary-light-7: #ff8787;
+  --el-color-primary-light-8: #ffa3a3;
+  --el-color-primary-light-9: #ffbfbf;
+  --el-color-primary-dark-2: #8b0000;
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+  --el-font-family: 'KaiTi', '楷体', 'STKaiti', '华文楷体', sans-serif;
+}
+
+/* 龙纹背景装饰 */
+.dragon-pattern-bg {
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(212, 175, 55, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, rgba(212, 175, 55, 0.1) 0%, transparent 50%);
+  position: relative;
+}
+
+.dragon-pattern-bg::before {
+  content: '龍';
+  position: absolute;
+  font-size: 300px;
+  color: var(--golden);
+  opacity: 0.03;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-15deg);
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 中国结装饰 */
+.chinese-knot {
+  position: relative;
+}
+
+.chinese-knot::before {
+  content: '🧧';
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  font-size: 40px;
+  animation: swing 3s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+@keyframes swing {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+
+/* 祥云装饰边框 */
+.auspicious-border {
+  border: 3px solid transparent;
+  border-image: linear-gradient(
+    45deg,
+    var(--primary-red) 0%,
+    var(--golden) 25%,
+    var(--primary-red) 50%,
+    var(--golden) 75%,
+    var(--primary-red) 100%
+  ) 1;
+  position: relative;
+  padding: 20px;
+  background: white;
+}
+
+.auspicious-border::before,
+.auspicious-border::after {
+  content: '☁';
+  position: absolute;
+  font-size: 30px;
+  color: var(--golden);
+  opacity: 0.5;
+}
+
+.auspicious-border::before {
+  top: -15px;
+  left: 20px;
+}
+
+.auspicious-border::after {
+  bottom: -15px;
+  right: 20px;
+}
+
+/* 金色光晕效果 */
+.golden-glow {
+  position: relative;
+  animation: golden-pulse 2s ease-in-out infinite;
+}
+
+@keyframes golden-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(212, 175, 55, 0.6);
+  }
+}
+
+/* 中国红渐变按钮 */
+.el-button--primary {
+  background: var(--red-gradient);
+  border: 2px solid var(--golden);
+  font-weight: bold;
+  letter-spacing: 2px;
+  box-shadow: 0 4px 15px rgba(200, 16, 46, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.el-button--primary:hover {
+  background: linear-gradient(135deg, #8b0000 0%, #660000 100%);
+  border-color: var(--golden-yellow);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(200, 16, 46, 0.4);
+}
+
+/* 卡片龙纹装饰 */
+.el-card {
+  border-radius: 16px;
+  border: 2px solid transparent;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(200, 16, 46, 0.08);
+  position: relative;
+  overflow: visible;
+}
+
+.el-card::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, var(--primary-red), var(--golden), var(--primary-red));
+  border-radius: 16px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.el-card:hover::before {
+  opacity: 1;
+}
+
+.el-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 32px rgba(200, 16, 46, 0.2);
+}
+
+/* 标签中国风样式 */
+.el-tag {
+  border-radius: 20px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  padding: 8px 16px;
+  border: 2px solid;
+}
+
+.el-tag.el-tag--danger {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+  color: var(--primary-red);
+  border-color: var(--primary-red);
+}
+
+.el-tag.el-tag--success {
+  background: var(--gold-gradient);
+  color: var(--deep-red);
+  border-color: var(--dark-gold);
+}
+
+/* 输入框中国风 */
+.el-input__wrapper {
+  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+  transition: all 0.3s;
+  box-shadow: none;
+}
+
+.el-input__wrapper:hover {
+  border-color: var(--golden);
+}
+
+.el-input__wrapper.is-focus {
+  border-color: var(--primary-red);
+  box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.1);
+}
+
+/* 进度条中国风 */
+.el-progress__text {
+  font-weight: bold;
+  color: var(--primary-red);
+}
+
+.el-progress-bar__inner {
+  background: var(--red-gradient);
+}
+
+/* 分页器中国风 */
+.el-pager li.is-active {
+  background: var(--red-gradient);
+  border-color: var(--golden);
+  font-weight: bold;
+}
+
+/* 表格中国风 */
+.el-table thead {
+  background: linear-gradient(to bottom, #fff5f5, white);
+}
+
+.el-table th {
+  background: transparent;
+  color: var(--primary-red);
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.el-table tr:hover {
+  background: rgba(200, 16, 46, 0.03);
+}
+
+/* 对话框中国风 */
+.el-dialog {
+  border-radius: 16px;
+  border: 3px solid var(--golden);
+  box-shadow: 0 20px 60px rgba(200, 16, 46, 0.3);
+}
+
+.el-dialog__header {
+  background: var(--red-gradient);
+  color: white;
+  font-weight: bold;
+  letter-spacing: 2px;
+  border-radius: 13px 13px 0 0;
+  padding: 20px;
+}
+
+.el-dialog__title {
+  color: white;
+  font-size: 20px;
+}
+
+/* 下拉菜单中国风 */
+.el-dropdown-menu {
+  border: 2px solid var(--golden);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(200, 16, 46, 0.2);
+}
+
+.el-dropdown-menu__item:hover {
+  background: rgba(200, 16, 46, 0.08);
+  color: var(--primary-red);
+}
+
+/* 消息提示中国风 */
+.el-message {
+  border-radius: 8px;
+  border: 2px solid var(--golden);
+  box-shadow: 0 10px 30px rgba(200, 16, 46, 0.2);
+}
+
+.el-message--success {
+  background: linear-gradient(135deg, #f1f8e9 0%, #dcedc8 100%);
+  border-color: #558b2f;
+}
+
+.el-message--error {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+  border-color: var(--primary-red);
+}
+
+/* 时间轴中国风 */
+.el-timeline-item__timestamp {
+  color: var(--primary-red);
+  font-weight: bold;
+}
+
+.el-timeline-item__node {
+  background: var(--golden);
+  border: 3px solid var(--primary-red);
+}
+
+/* 头像中国风边框 */
+.el-avatar {
+  border: 3px solid var(--golden);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+}
+
+/* 单选按钮组中国风 */
+.el-radio-button__inner {
+  border-color: var(--primary-red);
+  color: var(--primary-red);
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.el-radio-button__original-radio:checked + .el-radio-button__inner {
+  background: var(--red-gradient);
+  border-color: var(--golden);
+  box-shadow: 0 4px 12px rgba(200, 16, 46, 0.3);
+}
+
+/* 轮播图指示器 */
+.el-carousel__indicator.is-active button {
+  background: var(--golden);
+  width: 30px;
+  border-radius: 5px;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: linear-gradient(to bottom, #fff5f5, #ffffff);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--red-gradient);
+  border-radius: 5px;
+  border: 2px solid var(--golden);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #8b0000 0%, #660000 100%);
+}
+
+/* 选择器下拉中国风 */
+.el-select-dropdown {
+  border: 2px solid var(--golden);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(200, 16, 46, 0.2);
+}
+
+.el-select-dropdown__item.is-selected {
+  background: rgba(200, 16, 46, 0.1);
+  color: var(--primary-red);
+  font-weight: bold;
+}
+
+/* 加载动画 */
+.el-loading-spinner .circular {
+  stroke: var(--golden);
+}
+
+/* 页签中国风 */
+.el-tabs__item {
+  color: #666;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.el-tabs__item.is-active {
+  color: var(--primary-red);
+}
+
+.el-tabs__active-bar {
+  background: var(--gold-gradient);
+  height: 3px;
+}
+

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🐉 青少年爱国教育平台 - 龙腾华夏</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐉</text></svg>">
+  <style>
+    /* 页面加载动画 */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(135deg, #c8102e 0%, #8b0000 50%, #660000 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s;
+    }
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .dragon-loader {
+      font-size: 80px;
+      animation: dragon-dance 2s ease-in-out infinite;
+    }
+    @keyframes dragon-dance {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      25% { transform: scale(1.1) rotate(-5deg); }
+      75% { transform: scale(1.1) rotate(5deg); }
+    }
+    .loading-text {
+      color: #ffd700;
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 20px;
+      letter-spacing: 4px;
+      font-family: 'KaiTi', '楷体', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div class="dragon-loader">🐉</div>
+    <div class="loading-text">龙腾华夏</div>
+  </div>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+  <script>
+    // 页面加载完成后隐藏加载动画
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.getElementById('loading').classList.add('hidden');
+      }, 1000);
+    });
+  </script>
+</body>
+</html>
+
