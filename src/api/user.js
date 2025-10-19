@@ -2,10 +2,14 @@ import request from './request'
 
 /**
  * 用户登录
+ * @param {Object} data - 登录数据
+ * @param {String} data.email - 邮箱
+ * @param {String} data.password - 密码（6-20位）
+ * @returns {Promise} 返回token
  */
 export function login(data) {
   return request({
-    url: '/user/login',
+    url: '/server/login/login',
     method: 'post',
     data
   })
@@ -13,10 +17,17 @@ export function login(data) {
 
 /**
  * 用户注册
+ * @param {Object} data - 注册数据
+ * @param {Number} data.avatarId - 头像文件ID
+ * @param {String} data.username - 用户名
+ * @param {String} data.email - 邮箱
+ * @param {String} data.phone - 手机号
+ * @param {String} data.code - 邮箱验证码
+ * @param {String} data.password - 密码
  */
 export function register(data) {
   return request({
-    url: '/user/register',
+    url: '/server/login/register',
     method: 'post',
     data
   })
@@ -27,7 +38,7 @@ export function register(data) {
  */
 export function getUserInfo() {
   return request({
-    url: '/user/info',
+    url: '/server/login/info',
     method: 'get'
   })
 }
@@ -66,13 +77,31 @@ export function getPointsHistory(params) {
 }
 
 /**
- * 发送验证码
+ * 发送注册邮箱验证码
  */
-export function sendVerifyCode(data) {
+export function sendRegisterCode(email) {
   return request({
-    url: '/user/send-code',
+    url: '/server/login/sendRegisterCode',
     method: 'post',
-    data
+    params: {
+      email
+    }
+  })
+}
+
+/**
+ * 上传文件
+ */
+export function uploadFile(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request({
+    url: '/server/common/upload',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
   })
 }
 

@@ -5,7 +5,7 @@
     <div class="profile-container">
       <el-card class="profile-card">
         <div class="avatar-section">
-          <el-avatar :size="120" :src="userInfo.avatar">
+          <el-avatar :size="120" :src="userInfo.avatarUrl">
             <el-icon><User /></el-icon>
           </el-avatar>
           <el-button type="primary" size="small" style="margin-top: 16px">更换头像</el-button>
@@ -110,14 +110,20 @@ export default {
     const loading = ref(false)
 
     const userInfo = reactive({
+      id: null,
       username: '',
       email: '',
       phone: '',
-      avatar: '',
+      avatarId: null,
+      avatarUrl: '',
+      role: null,
+      status: false,
       gender: 'male',
       birthday: '',
       signature: '',
-      points: 0
+      points: 0,
+      createTime: '',
+      updateTime: ''
     })
 
     const stats = reactive({

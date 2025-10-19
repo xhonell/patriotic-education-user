@@ -69,39 +69,66 @@
       </div>
 
       <el-form :model="loginForm" :rules="rules" ref="loginFormRef" class="login-form">
-        <el-form-item prop="username">
+        <el-form-item prop="email">
           <div class="input-label">
-            <el-icon><User /></el-icon>
-            账号
+            <el-icon><Message /></el-icon>
+            邮箱
+            <span class="label-tip">📧</span>
           </div>
           <el-input
-            v-model="loginForm.username"
-            placeholder="请输入用户名/邮箱/手机号"
+            v-model="loginForm.email"
+            placeholder="请输入邮箱地址"
             size="large"
             class="custom-input"
-          />
+            type="email"
+          >
+            <template #prefix>
+              <el-icon class="input-icon"><User /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
 
         <el-form-item prop="password">
           <div class="input-label">
             <el-icon><Lock /></el-icon>
             密码
+            <span class="label-tip">🔒</span>
           </div>
           <el-input
             v-model="loginForm.password"
             type="password"
-            placeholder="请输入密码"
+            placeholder="请输入密码（6-20位）"
             size="large"
             show-password
             class="custom-input"
-          />
+            maxlength="20"
+          >
+            <template #prefix>
+              <el-icon class="input-icon"><Lock /></el-icon>
+            </template>
+          </el-input>
         </el-form-item>
 
         <el-form-item class="remember-row">
-          <el-checkbox v-model="loginForm.remember" class="custom-checkbox">
-            <span class="checkbox-text">记住我</span>
-          </el-checkbox>
-          <el-link type="primary" :underline="false" class="forgot-link">忘记密码？</el-link>
+          <div class="remember-section">
+            <el-checkbox v-model="loginForm.remember" class="custom-checkbox">
+              <span class="checkbox-text">
+                记住我
+                <span class="checkbox-icon">💾</span>
+              </span>
+            </el-checkbox>
+            <div v-if="loginForm.remember" class="remember-tip">
+              下次将自动填充账号密码
+            </div>
+          </div>
+          <div class="forgot-section">
+            <el-link type="primary" :underline="false" class="forgot-link">
+              <span class="forgot-text">
+                忘记密码？
+                <span class="forgot-icon">🔑</span>
+              </span>
+            </el-link>
+          </div>
         </el-form-item>
 
         <el-form-item>
@@ -135,10 +162,11 @@
 </template>
 
 <script>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { login, getUserInfo } from '@/api/user'
 
 export default {
   name: 'Login',
@@ -149,18 +177,64 @@ export default {
     const loading = ref(false)
 
     const loginForm = reactive({
-      username: '',
+      email: '',
       password: '',
       remember: false
     })
 
+    // 从本地缓存加载保存的登录信息
+    const loadRememberedLogin = () => {
+      const rememberedEmail = localStorage.getItem('rememberedEmail')
+      const rememberedPassword = localStorage.getItem('rememberedPassword')
+      const isRemember = localStorage.getItem('isRemember')
+      
+      if (isRemember === 'true' && rememberedEmail) {
+        loginForm.email = rememberedEmail
+        loginForm.password = rememberedPassword || ''
+        loginForm.remember = true
+        
+        // 显示欢迎提示
+        setTimeout(() => {
+          ElMessage.info({
+            message: '✨ 已为您自动填充上次登录的账号信息',
+            duration: 3000
+          })
+        }, 500)
+        
+        console.log('已自动填充上次登录的账号信息')
+      }
+    }
+
+    // 保存或清除登录信息
+    const handleRememberLogin = (remember, email, password) => {
+      if (remember) {
+        // 保存到本地缓存
+        localStorage.setItem('rememberedEmail', email)
+        localStorage.setItem('rememberedPassword', password)
+        localStorage.setItem('isRemember', 'true')
+        console.log('已保存登录信息到本地缓存')
+      } else {
+        // 清除缓存
+        localStorage.removeItem('rememberedEmail')
+        localStorage.removeItem('rememberedPassword')
+        localStorage.removeItem('isRemember')
+        console.log('已清除缓存的登录信息')
+      }
+    }
+
+    // 组件挂载时加载记住的登录信息
+    onMounted(() => {
+      loadRememberedLogin()
+    })
+
     const rules = {
-      username: [
-        { required: true, message: '请输入用户名/邮箱/手机号', trigger: 'blur' }
+      email: [
+        { required: true, message: '请输入邮箱地址', trigger: 'blur' },
+        { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
       ],
       password: [
         { required: true, message: '请输入密码', trigger: 'blur' },
-        { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
+        { min: 6, max: 20, message: '密码长度应在6-20个字符之间', trigger: 'blur' }
       ]
     }
 
@@ -171,29 +245,67 @@ export default {
         if (valid) {
           loading.value = true
           
-          // 模拟登录API调用
-          setTimeout(() => {
-            // 模拟登录成功
-            const userInfo = {
-              id: 1,
-              username: loginForm.username,
-              email: 'user@example.com',
-              avatar: 'https://via.placeholder.com/100',
-              phone: '13800138000',
-              points: 1250
+          try {
+            // 准备登录数据
+            const loginData = {
+              email: loginForm.email,
+              password: loginForm.password
             }
             
-            const token = 'mock-token-' + Date.now()
+            console.log('登录请求数据：', loginData)
             
-            userStore.login(userInfo, token)
+            // 调用登录API
+            const response = await login(loginData)
             
-            ElMessage.success('登录成功！')
+            if (response.code === 200) {
+              // 保存token
+              const token = response.data
+              userStore.token = token
+              localStorage.setItem('token', token)
+              
+              // 处理"记住我"功能
+              handleRememberLogin(loginForm.remember, loginForm.email, loginForm.password)
+              
+              // 获取用户信息
+              try {
+                const userInfoResponse = await getUserInfo()
+                if (userInfoResponse.code === 200) {
+                  // 保存用户信息到store
+                  userStore.login(userInfoResponse.data, token)
+                  
+                  ElMessage.success({
+                    message: loginForm.remember 
+                      ? '🎉 登录成功！已保存登录信息！' 
+                      : '🎉 登录成功！欢迎回来！',
+                    duration: 2000
+                  })
+                  
+                  // 延迟跳转
+                  setTimeout(() => {
+                    const redirect = router.currentRoute.value.query.redirect || '/home'
+                    router.push(redirect)
+                  }, 1000)
+                }
+              } catch (error) {
+                console.error('获取用户信息失败：', error)
+                // 即使获取用户信息失败，也保存token
+                userStore.token = token
+                ElMessage.success('登录成功！')
+                
+                setTimeout(() => {
+                  const redirect = router.currentRoute.value.query.redirect || '/home'
+                  router.push(redirect)
+                }, 1000)
+              }
+            } else {
+              ElMessage.error(response.message || '登录失败，请检查邮箱和密码')
+            }
+          } catch (error) {
+            console.error('登录失败：', error)
+          
+          } finally {
             loading.value = false
-            
-            // 跳转到首页或重定向页面
-            const redirect = router.currentRoute.value.query.redirect || '/home'
-            router.push(redirect)
-          }, 1000)
+          }
         }
       })
     }
@@ -208,7 +320,8 @@ export default {
       loginFormRef,
       loading,
       handleLogin,
-      goToRegister
+      goToRegister,
+      loadRememberedLogin
     }
   }
 }
@@ -577,6 +690,26 @@ export default {
   letter-spacing: 2px;
 }
 
+.label-tip {
+  margin-left: auto;
+  font-size: 14px;
+  animation: tip-float 2s ease-in-out infinite;
+}
+
+@keyframes tip-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.input-icon {
+  color: var(--golden);
+  font-size: 16px;
+}
+
 .custom-input {
   border-radius: 12px;
 }
@@ -602,25 +735,139 @@ export default {
 .remember-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 20px;
+  min-height: 24px;
+}
+
+.remember-row :deep(.el-form-item__content) {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+
+.remember-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.forgot-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding-top: 2px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .custom-checkbox {
   font-weight: 500;
 }
 
+.custom-checkbox :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: var(--primary-red);
+  border-color: var(--primary-red);
+}
+
+.custom-checkbox :deep(.el-checkbox__input.is-checked + .el-checkbox__label) {
+  color: var(--primary-red);
+}
+
 .checkbox-text {
   color: #666;
   letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.3s;
+}
+
+.custom-checkbox:hover .checkbox-text {
+  color: var(--primary-red);
+}
+
+.checkbox-icon {
+  font-size: 14px;
+  animation: save-bounce 2s ease-in-out infinite;
+}
+
+@keyframes save-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.remember-tip {
+  font-size: 11px;
+  color: var(--golden);
+  padding-left: 24px;
+  letter-spacing: 0.5px;
+  animation: tip-slide-in 0.3s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.remember-tip::before {
+  content: '✓';
+  font-weight: bold;
+  color: var(--primary-red);
+}
+
+@keyframes tip-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .forgot-link {
   font-weight: bold;
   letter-spacing: 1px;
+  transition: all 0.3s;
 }
 
-.forgot-link:hover {
+.forgot-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary-red);
+  transition: color 0.3s;
+}
+
+.forgot-link:hover .forgot-text {
   color: var(--golden) !important;
+}
+
+.forgot-icon {
+  font-size: 14px;
+  animation: key-rotate 3s ease-in-out infinite;
+}
+
+@keyframes key-rotate {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-15deg);
+  }
+  75% {
+    transform: rotate(15deg);
+  }
 }
 
 /* 登录按钮 */

@@ -86,6 +86,37 @@
       </div>
 
       <el-form :model="registerForm" :rules="rules" ref="registerFormRef" class="register-form">
+        <!-- 头像上传 -->
+        <el-form-item class="avatar-upload-item">
+          <div class="avatar-upload-container">
+            <div class="avatar-label">
+              <el-icon><Avatar /></el-icon>
+              <span>设置头像</span>
+            </div>
+            <div class="avatar-upload-wrapper">
+              <el-upload
+                class="avatar-uploader"
+                :show-file-list="false"
+                :before-upload="beforeAvatarUpload"
+                :http-request="handleAvatarUpload"
+                accept="image/*"
+              >
+                <div class="avatar-preview" :class="{ 'has-avatar': registerForm.avatarUrl }">
+                  <img v-if="registerForm.avatarUrl" :src="registerForm.avatarUrl" class="avatar" />
+                  <div v-else class="avatar-placeholder">
+                    <el-icon class="avatar-icon"><Plus /></el-icon>
+                    <div class="avatar-text">点击上传</div>
+                  </div>
+                </div>
+              </el-upload>
+              <div class="avatar-tips">
+                <span class="tip-icon">💡</span>
+                <span class="tip-text">支持JPG、PNG格式，大小不超过2MB</span>
+              </div>
+            </div>
+          </div>
+        </el-form-item>
+
         <el-form-item prop="username">
           <div class="input-label">
             <el-icon><User /></el-icon>
@@ -128,23 +159,41 @@
         <el-form-item prop="code">
           <div class="input-label">
             <el-icon><ChatLineSquare /></el-icon>
-            验证码
+            邮箱验证码
+            <span class="label-decoration">✨</span>
           </div>
           <div class="code-input-group">
             <el-input
               v-model="registerForm.code"
-              placeholder="请输入验证码"
+              placeholder="请输入邮箱验证码"
               size="large"
               class="custom-input code-input"
-            />
+              maxlength="6"
+            >
+              <template #prefix>
+                <el-icon class="input-icon"><Key /></el-icon>
+              </template>
+            </el-input>
             <el-button 
               size="large" 
-              :disabled="countdown > 0" 
+              :disabled="countdown > 0 || sendingCode" 
               @click="sendCode"
+              :loading="sendingCode"
               class="code-button"
             >
-              {{ countdown > 0 ? `${countdown}秒` : '获取验证码' }}
+              <span v-if="countdown > 0" class="countdown-text">
+                <el-icon class="countdown-icon"><Timer /></el-icon>
+                {{ countdown }}秒后重试
+              </span>
+              <span v-else class="send-text">
+                <el-icon><Message /></el-icon>
+                获取验证码
+              </span>
             </el-button>
+          </div>
+          <div class="code-tips">
+            <el-icon class="tip-icon"><InfoFilled /></el-icon>
+            <span class="tip-text">验证码将发送至您的邮箱，1分钟内仅可获取一次</span>
           </div>
         </el-form-item>
 
@@ -223,6 +272,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { uploadFile, sendRegisterCode, register } from '@/api/user'
 
 export default {
   name: 'Register',
@@ -231,8 +281,12 @@ export default {
     const registerFormRef = ref(null)
     const loading = ref(false)
     const countdown = ref(0)
+    const uploadLoading = ref(false)
+    const sendingCode = ref(false)
 
     const registerForm = reactive({
+      avatarId: null,        // 用于提交给后端的文件ID
+      avatarUrl: '',         // 用于前端回显的文件URL
       username: '',
       email: '',
       phone: '',
@@ -277,27 +331,46 @@ export default {
       ]
     }
 
-    const sendCode = () => {
-      if (!registerForm.phone) {
-        ElMessage.warning('请先输入手机号')
+    const sendCode = async () => {
+      // 验证邮箱是否已填写
+      if (!registerForm.email) {
+        ElMessage.warning('请先输入邮箱地址')
         return
       }
 
-      if (!/^1[3-9]\d{9}$/.test(registerForm.phone)) {
-        ElMessage.warning('请输入正确的手机号')
+      // 验证邮箱格式
+      const emailReg = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/
+      if (!emailReg.test(registerForm.email)) {
+        ElMessage.warning('请输入正确的邮箱格式')
         return
       }
 
-      // 模拟发送验证码
-      ElMessage.success('验证码已发送')
-      countdown.value = 60
-      
-      const timer = setInterval(() => {
-        countdown.value--
-        if (countdown.value <= 0) {
-          clearInterval(timer)
+      try {
+        sendingCode.value = true
+        const response = await sendRegisterCode(registerForm.email)
+        
+        if (response.code === 200) {
+          ElMessage.success({
+            message: '验证码已发送至您的邮箱，请注意查收！',
+            duration: 3000
+          })
+          
+          // 开始倒计时（60秒 = 1分钟）
+          countdown.value = 60
+          const timer = setInterval(() => {
+            countdown.value--
+            if (countdown.value <= 0) {
+              clearInterval(timer)
+            }
+          }, 1000)
+        } else {
+          ElMessage.error(response.message || '验证码发送失败')
         }
-      }, 1000)
+      } catch (error) {
+        console.error('发送验证码失败：', error)
+      } finally {
+        sendingCode.value = false
+      }
     }
 
     const handleRegister = async () => {
@@ -312,12 +385,39 @@ export default {
         if (valid) {
           loading.value = true
           
-          // 模拟注册API调用
-          setTimeout(() => {
-            ElMessage.success('注册成功！请登录')
+          try {
+            // 准备提交数据
+            const submitData = {
+              avatarId: registerForm.avatarId,     // 提交文件ID给后端
+              username: registerForm.username,
+              email: registerForm.email,
+              phone: registerForm.phone,
+              code: registerForm.code,
+              password: registerForm.password
+            }
+            
+            console.log('提交的注册数据：', submitData)
+            
+            // 调用注册API
+            const response = await register(submitData)
+            
+            if (response.code === 200) {
+              ElMessage.success({
+                message: '🎉 注册成功！欢迎加入爱国教育平台！',
+                duration: 2000
+              })
+              // 延迟跳转，让用户看到成功提示
+              setTimeout(() => {
+                router.push('/login')
+              }, 1500)
+            } else {
+              ElMessage.error(response.message || '注册失败，请重试')
+            }
+          } catch (error) {
+            console.error('注册失败：', error)
+          } finally {
             loading.value = false
-            router.push('/login')
-          }, 1000)
+          }
         }
       })
     }
@@ -326,15 +426,55 @@ export default {
       router.push('/login')
     }
 
+    // 头像上传前验证
+    const beforeAvatarUpload = (file) => {
+      const isImage = file.type.startsWith('image/')
+      const isLt2M = file.size / 1024 / 1024 < 2
+
+      if (!isImage) {
+        ElMessage.error('只能上传图片文件！')
+        return false
+      }
+      if (!isLt2M) {
+        ElMessage.error('图片大小不能超过 2MB！')
+        return false
+      }
+      return true
+    }
+
+    // 自定义上传
+    const handleAvatarUpload = async ({ file }) => {
+      uploadLoading.value = true
+      try {
+        const response = await uploadFile(file)
+        if (response.code === 200) {
+          // 保存文件ID用于提交，保存URL用于回显
+          registerForm.avatarId = response.data.fileId
+          registerForm.avatarUrl = response.data.filePathUrl
+          ElMessage.success('头像上传成功！')
+        } else {
+          ElMessage.error(response.message || '上传失败')
+        }
+      } catch (error) {
+        console.error('上传失败：', error)
+      } finally {
+        uploadLoading.value = false
+      }
+    }
+
     return {
       registerForm,
       rules,
       registerFormRef,
       loading,
       countdown,
+      uploadLoading,
+      sendingCode,
       sendCode,
       handleRegister,
-      goToLogin
+      goToLogin,
+      beforeAvatarUpload,
+      handleAvatarUpload
     }
   }
 }
@@ -774,6 +914,108 @@ export default {
   margin-top: 30px;
 }
 
+/* 头像上传样式 */
+.avatar-upload-item {
+  margin-bottom: 30px;
+}
+
+.avatar-upload-container {
+  width: 100%;
+}
+
+.avatar-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 15px;
+  color: var(--primary-red);
+  font-weight: bold;
+  font-size: 16px;
+  letter-spacing: 2px;
+}
+
+.avatar-upload-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar-uploader {
+  cursor: pointer;
+}
+
+.avatar-preview {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 3px solid var(--golden);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.2);
+}
+
+.avatar-preview:hover {
+  border-color: var(--primary-red);
+  box-shadow: 0 6px 20px rgba(200, 16, 46, 0.3);
+  transform: scale(1.05);
+}
+
+.avatar-preview.has-avatar {
+  background: white;
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-red);
+  gap: 8px;
+}
+
+.avatar-icon {
+  font-size: 40px;
+  color: var(--golden);
+}
+
+.avatar-text {
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.avatar-tips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 15px;
+  background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
+  border-radius: 8px;
+  border: 1px solid var(--golden);
+}
+
+.tip-icon {
+  font-size: 16px;
+}
+
+.tip-text {
+  font-size: 12px;
+  color: #666;
+  letter-spacing: 0.5px;
+}
+
 .input-label {
   display: flex;
   align-items: center;
@@ -804,19 +1046,46 @@ export default {
   box-shadow: 0 4px 20px rgba(200, 16, 46, 0.25);
 }
 
-/* 验证码输入 */
+/* 输入框图标 */
+.input-icon {
+  color: var(--golden);
+  font-size: 16px;
+  margin-right: 5px;
+}
+
+/* 标签装饰 */
+.label-decoration {
+  margin-left: 6px;
+  font-size: 14px;
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+/* 验证码输入区域 */
 .code-input-group {
   display: flex;
   gap: 12px;
   align-items: center;
+  margin-bottom: 12px;
 }
 
 .code-input {
   flex: 1;
 }
 
+/* 验证码按钮样式 */
 .code-button {
-  min-width: 130px;
+  min-width: 145px;
   height: 50px !important;
   font-weight: bold;
   letter-spacing: 1px;
@@ -824,12 +1093,29 @@ export default {
   color: var(--primary-red);
   background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
   border-radius: 12px;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0 20px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.code-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.code-button:hover:not(:disabled)::before {
+  left: 100%;
 }
 
 .code-button :deep(.el-button) {
@@ -842,13 +1128,84 @@ export default {
 .code-button:hover:not(:disabled) {
   background: var(--gold-gradient);
   color: var(--deep-red);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+  border-color: var(--golden-yellow);
+}
+
+.code-button:active:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .code-button:disabled {
-  opacity: 0.6;
+  opacity: 0.65;
   cursor: not-allowed;
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  border-color: #dcdcdc;
+  color: #999;
+}
+
+/* 发送按钮文本 */
+.send-text,
+.countdown-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.countdown-text {
+  color: #999;
+}
+
+.countdown-icon {
+  animation: tick 1s linear infinite;
+}
+
+@keyframes tick {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 验证码提示 */
+.code-tips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  background: linear-gradient(135deg, #fff9f0 0%, #fff5e6 100%);
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  margin-top: 10px;
+  animation: tips-appear 0.5s ease-out;
+}
+
+@keyframes tips-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tip-icon {
+  color: var(--golden);
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.tip-text {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
 }
 
 /* 同意条款 */
