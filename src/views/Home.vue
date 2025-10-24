@@ -1,11 +1,16 @@
 <template>
   <div class="home">
     <!-- 轮播图 -->
-    <el-carousel height="400px" class="banner">
+    <el-carousel height="400px" class="banner" v-if="banners.length > 0">
       <el-carousel-item v-for="item in banners" :key="item.id">
-        <div class="banner-item" :style="{ background: item.color }">
-          <h2>{{ item.title }}</h2>
-          <p>{{ item.description }}</p>
+        <div class="banner-item" :style="{ 
+          backgroundImage: item.filePathUrl ? `url(${item.filePathUrl})` : item.color,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }">
+          <div class="banner-title">
+            <h2>{{ item.title }}</h2>
+          </div>
         </div>
       </el-carousel-item>
     </el-carousel>
@@ -79,32 +84,25 @@
 <script>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getBannerList } from '@/api/content'
+import { ElMessage } from 'element-plus'
 
 export default {
   name: 'Home',
   setup() {
     const router = useRouter()
 
-    const banners = ref([
-      {
-        id: 1,
-        title: '学习爱国主义精神',
-        description: '传承红色基因，培育时代新人',
-        color: 'linear-gradient(135deg, #c31432 0%, #e74c3c 100%)'
-      },
-      {
-        id: 2,
-        title: '探索中华文化',
-        description: '感受五千年文明的魅力',
-        color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-      },
-      {
-        id: 3,
-        title: '共建和谐社区',
-        description: '分享学习心得，交流成长感悟',
-        color: 'linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%)'
-      }
-    ])
+    // 轮播图数据（从后端获取）
+    const banners = ref([])
+    
+    // 默认的背景渐变色
+    const defaultColors = [
+      'linear-gradient(135deg, #c31432 0%, #e74c3c 100%)',
+      'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      'linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%)',
+      'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
+    ]
 
     const recommendations = ref([
       {
@@ -187,6 +185,37 @@ export default {
       e.target.src = 'https://via.placeholder.com/300x200?text=Image'
     }
 
+    // 获取轮播图数据
+    const fetchBanners = async () => {
+      try {
+        const res = await getBannerList()
+        if (res.code === 200 && res.data) {
+          // 过滤状态为启用的轮播图，并添加颜色
+          banners.value = res.data
+            .filter(item => item.status === true)
+            .map((item, index) => ({
+              ...item,
+              color: defaultColors[index % defaultColors.length] // 备用渐变色
+            }))
+        }
+      } catch (error) {
+        console.error('获取轮播图失败：', error)
+        // 失败时使用默认轮播图
+        banners.value = [
+          {
+            id: 1,
+            title: '学习爱国主义精神',
+            color: 'linear-gradient(135deg, #c31432 0%, #e74c3c 100%)'
+          }
+        ]
+      }
+    }
+
+    // 组件挂载时获取数据
+    onMounted(() => {
+      fetchBanners()
+    })
+
     return {
       banners,
       recommendations,
@@ -212,23 +241,72 @@ export default {
 }
 
 .banner-item {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  position: relative;
   height: 100%;
   color: white;
-  text-align: center;
+  overflow: hidden;
 }
 
-.banner-item h2 {
-  font-size: 36px;
-  margin-bottom: 16px;
+/* 轮播图渐变遮罩 */
+.banner-item::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+  z-index: 1;
 }
 
-.banner-item p {
-  font-size: 18px;
-  opacity: 0.9;
+.banner-title {
+  position: absolute;
+  bottom: 30px;
+  left: 40px;
+  right: 40px;
+  z-index: 2;
+  animation: fadeInUp 0.8s ease-out;
+}
+
+.banner-title h2 {
+  font-size: 42px;
+  font-weight: bold;
+  margin: 0;
+  color: #fff;
+  text-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 4px 8px rgba(0, 0, 0, 0.2);
+  line-height: 1.3;
+  letter-spacing: 1px;
+}
+
+/* 添加中国风装饰条 */
+.banner-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -15px;
+  width: 80px;
+  height: 4px;
+  background: linear-gradient(90deg, #c31432 0%, #e74c3c 100%);
+  border-radius: 2px;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 轮播图悬停效果 */
+.banner-item:hover .banner-title::before {
+  width: 120px;
+  transition: width 0.3s ease;
 }
 
 .section {
@@ -410,13 +488,40 @@ export default {
   color: #666;
 }
 
-@media (max-width: 768px) {
-  .banner-item h2 {
-    font-size: 24px;
+/* 平板设备适配 */
+@media (max-width: 992px) and (min-width: 769px) {
+  .banner-title {
+    bottom: 25px;
+    left: 30px;
+    right: 30px;
   }
 
-  .banner-item p {
-    font-size: 14px;
+  .banner-title h2 {
+    font-size: 32px;
+  }
+
+  .banner-title::before {
+    width: 60px;
+  }
+}
+
+/* 移动设备适配 */
+@media (max-width: 768px) {
+  .banner-title {
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+  }
+
+  .banner-title h2 {
+    font-size: 24px;
+    letter-spacing: 0.5px;
+  }
+
+  .banner-title::before {
+    width: 50px;
+    height: 3px;
+    bottom: -10px;
   }
 
   .article-item {

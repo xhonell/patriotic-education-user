@@ -2,9 +2,15 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
+// 获取环境变量中的 API 基础地址
+const baseURL = import.meta.env.VITE_API_BASE_URL
+
+console.log('🌐 当前环境:', import.meta.env.MODE)
+console.log('🔗 API 基础地址:', baseURL)
+
 // 创建axios实例
 const request = axios.create({
-  baseURL: '/api', // 基础路径
+  baseURL: baseURL, // 使用环境变量配置的基础路径
   timeout: 10000 // 请求超时时间
 })
 

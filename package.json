@@ -4,9 +4,11 @@
   "description": "基于个性化推荐的青少年爱国教育平台-用户端",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "vite --mode development",
+    "build": "vite build --mode production",
+    "build:dev": "vite build --mode development",
+    "preview": "vite preview",
+    "preview:build": "vite build --mode production && vite preview"
   },
   "dependencies": {
     "vue": "^3.4.21",

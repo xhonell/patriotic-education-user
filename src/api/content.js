@@ -97,3 +97,13 @@ export function getComments(params) {
   })
 }
 
+/**
+ * 获取首页轮播图
+ */
+export function getBannerList() {
+  return request({
+    url: '/server/common/banner',
+    method: 'get'
+  })
+}
+
