@@ -84,8 +84,7 @@
 <script>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getBannerList } from '@/api/content'
-import { ElMessage } from 'element-plus'
+import { getBannerList, getRecommendList } from '@/api/content'
 
 export default {
   name: 'Home',
@@ -104,44 +103,7 @@ export default {
       'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
     ]
 
-    const recommendations = ref([
-      {
-        id: 1,
-        type: '文章',
-        title: '新中国成立的伟大历程',
-        description: '回顾新中国成立以来的辉煌历史',
-        cover: 'https://via.placeholder.com/300x200?text=Article+1',
-        views: 1250,
-        likes: 89
-      },
-      {
-        id: 2,
-        type: '视频',
-        title: '改革开放四十年',
-        description: '见证中国改革开放的伟大成就',
-        cover: 'https://via.placeholder.com/300x200?text=Video+1',
-        views: 2380,
-        likes: 156
-      },
-      {
-        id: 3,
-        type: '文章',
-        title: '科技强国之路',
-        description: '探索中国科技创新的发展历程',
-        cover: 'https://via.placeholder.com/300x200?text=Article+2',
-        views: 980,
-        likes: 72
-      },
-      {
-        id: 4,
-        type: '视频',
-        title: '人民英雄纪念碑',
-        description: '缅怀革命先烈，传承红色精神',
-        cover: 'https://via.placeholder.com/300x200?text=Video+2',
-        views: 1560,
-        likes: 123
-      }
-    ])
+    const recommendations = ref([])
 
     const hotArticles = ref([
       {
@@ -211,9 +173,30 @@ export default {
       }
     }
 
+    // 获取推荐内容数据
+    const fetchRecommendations = async () => {
+      try {
+        const res = await getRecommendList()
+        if (res.code === 200 && res.data) {
+          recommendations.value = res.data.map(item => ({
+            id: item.id,
+            type: item.type === 1 ? '文章' : '视频',
+            title: item.title,
+            description: item.description || item.reason || '精彩内容推荐',
+            cover: item.fileUrl || item.coverUrl || 'https://via.placeholder.com/300x200?text=Content',
+            views: item.viewCount || 0,
+            likes: item.likeCount || 0
+          }))
+        }
+      } catch (error) {
+        console.error('获取推荐内容失败：', error)
+      }
+    }
+
     // 组件挂载时获取数据
     onMounted(() => {
       fetchBanners()
+      fetchRecommendations()
     })
 
     return {

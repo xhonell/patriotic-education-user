@@ -107,3 +107,13 @@ export function getBannerList() {
   })
 }
 
+/**
+ * 获取推荐内容列表
+ */
+export function getRecommendList() {
+  return request({
+    url: '/server/recommend/list',
+    method: 'post'
+  })
+}
+
