@@ -6,9 +6,17 @@
         <el-card class="video-card">
           <!-- 视频播放器 -->
           <div class="video-player">
-            <div class="video-placeholder">
+            <video
+              v-if="video.videoUrl"
+              :src="video.videoUrl"
+              class="video-element"
+              controls
+              preload="metadata"
+              poster=""
+            />
+            <div v-else class="video-placeholder">
               <el-icon :size="80" color="#fff"><VideoPlay /></el-icon>
-              <p>视频播放器（可集成video.js或其他播放器）</p>
+              <p>视频加载中...</p>
             </div>
           </div>
 
@@ -130,6 +138,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getVideoDetailById, getRecommendVideos } from '@/api/content'
 
 export default {
   name: 'VideoDetail',
@@ -141,14 +150,16 @@ export default {
     const newComment = ref('')
 
     const video = reactive({
-      id: 1,
-      title: '改革开放四十年纪录片',
-      category: 'history',
-      publishDate: '2025-10-15',
-      views: 2380,
-      likes: 156,
-      duration: '42:35',
-      description: '这部纪录片全景展现了中国改革开放四十年来的伟大历程和辉煌成就。从1978年十一届三中全会开启改革开放大幕，到如今中国成为世界第二大经济体，四十年风雨兼程，四十年砥砺奋进。纪录片通过珍贵的历史影像、亲历者的深情讲述，展现了改革开放给中国带来的翻天覆地的变化，以及中国人民在这一伟大历史进程中的奋斗精神和创造智慧。'
+      id: null,
+      title: '',
+      category: null,
+      publishDate: '',
+      views: 0,
+      likes: 0,
+      duration: '00:00',
+      description: '',
+      videoUrl: '',
+      coverUrl: ''
     })
 
     const comments = reactive([
@@ -168,36 +179,7 @@ export default {
       }
     ])
 
-    const recommendations = reactive([
-      {
-        id: 2,
-        title: '中国航天事业发展历程',
-        cover: 'https://via.placeholder.com/200x150?text=Video+2',
-        duration: '28:15',
-        views: 1680
-      },
-      {
-        id: 3,
-        title: '抗美援朝战争纪实',
-        cover: 'https://via.placeholder.com/200x150?text=Video+3',
-        duration: '55:20',
-        views: 3200
-      },
-      {
-        id: 4,
-        title: '中华文化瑰宝系列',
-        cover: 'https://via.placeholder.com/200x150?text=Video+4',
-        duration: '32:48',
-        views: 1450
-      },
-      {
-        id: 5,
-        title: '新中国工业化建设',
-        cover: 'https://via.placeholder.com/200x150?text=Video+5',
-        duration: '38:22',
-        views: 1920
-      }
-    ])
+    const recommendations = ref([])
 
     const getCategoryType = (category) => {
       const typeMap = {
@@ -257,15 +239,64 @@ export default {
       window.scrollTo(0, 0)
     }
 
+    const formatDuration = (seconds) => {
+      if (!seconds && seconds !== 0) return '00:00'
+      const minutes = Math.floor(seconds / 60)
+      const secs = Math.floor(seconds % 60)
+      return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+    }
+
+    const fetchVideoDetail = async () => {
+      try {
+        const id = route.params.id
+        if (!id) return
+        const res = await getVideoDetailById(id)
+        if (res.code === 200 && res.data) {
+          const data = res.data
+          video.id = data.id
+          video.title = data.title
+          video.category = data.categoryId || data.tagId
+          video.publishDate = data.createTime ? data.createTime.split('T')[0] : ''
+          video.views = data.viewCount || 0
+          video.likes = data.likeCount || 0
+          video.duration = formatDuration(data.duration)
+          video.description = data.description || data.reason || ''
+          video.videoUrl = data.coverUrl || ''
+          video.coverUrl = data.fileUrl || ''
+        }
+      } catch (error) {
+        console.error('获取视频详情失败：', error)
+      }
+    }
+
+    const fetchRecommendations = async () => {
+      try {
+        const res = await getRecommendVideos()
+        if (res.code === 200 && res.data) {
+          const currentId = Number(route.params.id)
+          recommendations.value = res.data
+            .filter(item => item.id !== currentId)
+            .slice(0, 6)
+            .map(item => ({
+              id: item.id,
+              title: item.title,
+              cover: item.fileUrl || item.coverUrl || 'https://via.placeholder.com/200x150?text=Video',
+              duration: formatDuration(item.duration),
+              views: item.viewCount || 0
+            }))
+        }
+      } catch (error) {
+        console.error('获取推荐视频失败：', error)
+      }
+    }
+
     const handleImageError = (e) => {
       e.target.src = 'https://via.placeholder.com/200x150?text=Video'
     }
 
     onMounted(() => {
-      // 模拟观看完成后获得积分
-      setTimeout(() => {
-        ElMessage.success('恭喜完成观看！+30积分')
-      }, 10000)
+      fetchVideoDetail()
+      fetchRecommendations()
     })
 
     return {
@@ -305,6 +336,15 @@ export default {
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 20px;
+  position: relative;
+}
+
+.video-element {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: #000;
 }
 
 .video-placeholder {
@@ -474,6 +514,7 @@ export default {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
 }
 

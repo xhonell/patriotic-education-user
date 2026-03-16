@@ -33,11 +33,32 @@ export function getVideoList(params) {
 }
 
 /**
+ * 视频分页查询
+ */
+export function getVideoPage(data) {
+  return request({
+    url: '/server/video/page',
+    method: 'post',
+    data
+  })
+}
+
+/**
  * 获取视频详情
  */
 export function getVideoDetail(id) {
   return request({
     url: `/content/video/${id}`,
+    method: 'get'
+  })
+}
+
+/**
+ * 获取视频详情（新接口）
+ */
+export function getVideoDetailById(id) {
+  return request({
+    url: `/server/video/detail/${id}`,
     method: 'get'
   })
 }
@@ -113,6 +134,16 @@ export function getBannerList() {
 export function getRecommendList() {
   return request({
     url: '/server/recommend/list',
+    method: 'post'
+  })
+}
+
+/**
+ * 获取推荐视频列表
+ */
+export function getRecommendVideos() {
+  return request({
+    url: '/server/recommend/videos',
     method: 'post'
   })
 }

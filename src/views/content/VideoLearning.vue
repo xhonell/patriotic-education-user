@@ -8,10 +8,7 @@
         <el-form-item label="分类">
           <el-select v-model="filterForm.category" placeholder="请选择分类" clearable>
             <el-option label="全部" value="" />
-            <el-option label="历史纪录" value="history" />
-            <el-option label="科技成就" value="technology" />
-            <el-option label="文化传承" value="culture" />
-            <el-option label="英雄事迹" value="hero" />
+            <el-option v-for="option in categoryOptions" :key="option.id" :label="option.name" :value="option.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="时长">
@@ -53,7 +50,7 @@
             <h3 class="video-title">{{ video.title }}</h3>
             <p class="video-summary">{{ video.summary }}</p>
             <div class="video-tags">
-              <el-tag size="small" :type="getCategoryType(video.category)">{{ getCategoryText(video.category) }}</el-tag>
+              <el-tag size="small" :type="getCategoryType(video.tagId)">{{ video.tagName || '未标签' }}</el-tag>
             </div>
             <div class="video-footer">
               <div class="video-meta">
@@ -72,11 +69,13 @@
 
     <!-- 分页 -->
     <el-pagination
-      v-model:current-page="currentPage"
-      v-model:page-size="pageSize"
+      :current-page="currentPage"
+      :page-size="pageSize"
       :total="total"
       :page-sizes="[9, 18, 36]"
       layout="total, sizes, prev, pager, next, jumper"
+      @update:current-page="handleCurrentChange"
+      @update:page-size="handleSizeChange"
       @size-change="handleSizeChange"
       @current-change="handleCurrentChange"
       class="pagination"
@@ -85,8 +84,9 @@
 </template>
 
 <script>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getVideoPage } from '@/api/content'
 
 export default {
   name: 'VideoLearning',
@@ -99,115 +99,113 @@ export default {
       sort: 'latest'
     })
 
+    const categoryOptions = ref([])
+
     const currentPage = ref(1)
     const pageSize = ref(9)
-    const total = ref(80)
+    const total = ref(0)
 
-    const videos = reactive([
-      {
-        id: 1,
-        title: '改革开放四十年纪录片',
-        summary: '全景展现改革开放的伟大历程和辉煌成就',
-        cover: 'https://via.placeholder.com/400x300?text=Video+1',
-        duration: '42:35',
-        category: 'history',
-        views: 2380,
-        likes: 156,
-        points: 30
-      },
-      {
-        id: 2,
-        title: '中国航天事业发展历程',
-        summary: '从东方红一号到天宫空间站的辉煌历程',
-        cover: 'https://via.placeholder.com/400x300?text=Video+2',
-        duration: '28:15',
-        category: 'technology',
-        views: 1680,
-        likes: 142,
-        points: 25
-      },
-      {
-        id: 3,
-        title: '抗美援朝战争纪实',
-        summary: '回顾那段波澜壮阔的历史，致敬英雄',
-        cover: 'https://via.placeholder.com/400x300?text=Video+3',
-        duration: '55:20',
-        category: 'hero',
-        views: 3200,
-        likes: 289,
-        points: 35
-      },
-      {
-        id: 4,
-        title: '中华文化瑰宝系列',
-        summary: '探索五千年文明的璀璨文化',
-        cover: 'https://via.placeholder.com/400x300?text=Video+4',
-        duration: '32:48',
-        category: 'culture',
-        views: 1450,
-        likes: 118,
-        points: 30
-      },
-      {
-        id: 5,
-        title: '新中国工业化建设',
-        summary: '从一穷二白到世界工厂的伟大跨越',
-        cover: 'https://via.placeholder.com/400x300?text=Video+5',
-        duration: '38:22',
-        category: 'history',
-        views: 1920,
-        likes: 165,
-        points: 30
-      },
-      {
-        id: 6,
-        title: '科技创新引领未来',
-        summary: '见证中国科技从跟跑到并跑、领跑',
-        cover: 'https://via.placeholder.com/400x300?text=Video+6',
-        duration: '25:10',
-        category: 'technology',
-        views: 2100,
-        likes: 178,
-        points: 25
-      }
-    ])
+    const videos = ref([])
 
     const getCategoryType = (category) => {
       const typeMap = {
-        'history': 'danger',
-        'technology': 'success',
-        'culture': 'warning',
-        'hero': 'primary'
+        1: 'danger',
+        2: 'success',
+        3: 'warning',
+        4: 'primary'
       }
       return typeMap[category] || ''
     }
 
     const getCategoryText = (category) => {
-      const textMap = {
-        'history': '历史纪录',
-        'technology': '科技成就',
-        'culture': '文化传承',
-        'hero': '英雄事迹'
+      const option = categoryOptions.value.find(item => item.id === category)
+      return option ? option.name : '未分类'
+    }
+
+    const formatDuration = (seconds) => {
+      if (!seconds && seconds !== 0) return '00:00'
+      const minutes = Math.floor(seconds / 60)
+      const secs = Math.floor(seconds % 60)
+      return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+    }
+
+    const buildPageRequest = () => {
+      let minDuration
+      let maxDuration
+      if (filterForm.duration === 'short') {
+        maxDuration = 600
+      } else if (filterForm.duration === 'medium') {
+        minDuration = 600
+        maxDuration = 1800
+      } else if (filterForm.duration === 'long') {
+        minDuration = 1800
       }
-      return textMap[category] || ''
+
+      const sortByMap = {
+        latest: 1,
+        likes: 2,
+        views: 3
+      }
+
+      return {
+        page: currentPage.value,
+        pageSize: pageSize.value,
+        categoryId: filterForm.category || undefined,
+        minDuration,
+        maxDuration,
+        sortBy: sortByMap[filterForm.sort] || 1
+      }
+    }
+
+    const fetchVideos = async () => {
+      try {
+        const res = await getVideoPage(buildPageRequest())
+        if (res.code === 200 && res.data) {
+          const data = res.data
+          total.value = data.total || 0
+          videos.value = (data.videos || []).map(item => ({
+            id: item.id,
+            title: item.title,
+            summary: item.description || item.reason || '精彩视频推荐',
+            cover: item.fileUrl || item.coverUrl || 'https://via.placeholder.com/400x300?text=Video',
+            duration: formatDuration(item.duration),
+            category: item.categoryId || '',
+            categoryName: item.categoryName || '',
+            tagId: item.tagId || '',
+            tagName: item.tagName || '',
+            views: item.viewCount || 0,
+            likes: item.likeCount || 0,
+            points: item.difficultyScore ?? (item.score ? Math.round(item.score) : 30)
+          }))
+          fetchCategoryOptions()
+        }
+      } catch (error) {
+        console.error('获取视频列表失败：', error)
+      }
     }
 
     const handleSearch = () => {
-      console.log('搜索', filterForm)
+      currentPage.value = 1
+      fetchVideos()
     }
 
     const handleReset = () => {
       filterForm.category = ''
       filterForm.duration = ''
       filterForm.sort = 'latest'
+      currentPage.value = 1
+      fetchVideos()
     }
 
     const handleSizeChange = (val) => {
       pageSize.value = val
+      currentPage.value = 1
+      fetchVideos()
     }
 
     const handleCurrentChange = (val) => {
       currentPage.value = val
+      fetchVideos()
     }
 
     const goToDetail = (id) => {
@@ -218,8 +216,27 @@ export default {
       e.target.src = 'https://via.placeholder.com/400x300?text=Video'
     }
 
+    const fetchCategoryOptions = () => {
+      const map = new Map()
+      videos.value.forEach(item => {
+        if (item.category && !map.has(item.category)) {
+          map.set(item.category, {
+            id: item.category,
+            name: item.categoryName || `分类${item.category}`
+          })
+        }
+      })
+      categoryOptions.value = Array.from(map.values())
+    }
+
+    onMounted(async () => {
+      await fetchVideos()
+      fetchCategoryOptions()
+    })
+
     return {
       filterForm,
+      categoryOptions,
       currentPage,
       pageSize,
       total,
@@ -331,6 +348,7 @@ export default {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
 }
 
