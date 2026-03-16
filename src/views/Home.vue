@@ -84,7 +84,7 @@
 <script>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getBannerList, getRecommendList } from '@/api/content'
+import { getBannerList, getRecommendList, getWeeklyHotArticles, getStatistics } from '@/api/content'
 
 export default {
   name: 'Home',
@@ -105,30 +105,13 @@ export default {
 
     const recommendations = ref([])
 
-    const hotArticles = ref([
-      {
-        id: 1,
-        title: '抗美援朝战争中的英雄事迹',
-        summary: '回顾那段波澜壮阔的历史，致敬最可爱的人',
-        cover: 'https://via.placeholder.com/200x150?text=Hot+1',
-        category: '历史',
-        date: '2025-10-15'
-      },
-      {
-        id: 2,
-        title: '航天精神：从东方红到天宫空间站',
-        summary: '探索中国航天事业的发展历程和伟大成就',
-        cover: 'https://via.placeholder.com/200x150?text=Hot+2',
-        category: '科技',
-        date: '2025-10-14'
-      }
-    ])
+    const hotArticles = ref([])
 
     const stats = ref([
-      { label: '学习用户', value: '10000+', icon: 'UserFilled', color: '#409EFF' },
-      { label: '文章数量', value: '5000+', icon: 'Reading', color: '#67C23A' },
-      { label: '视频数量', value: '3000+', icon: 'VideoCamera', color: '#E6A23C' },
-      { label: '社区话题', value: '8000+', icon: 'ChatDotRound', color: '#F56C6C' }
+      { label: '学习用户', value: '-', icon: 'UserFilled', color: '#409EFF' },
+      { label: '文章数量', value: '-', icon: 'Reading', color: '#67C23A' },
+      { label: '视频数量', value: '-', icon: 'VideoCamera', color: '#E6A23C' },
+      { label: '内容总数', value: '-', icon: 'Collection', color: '#F56C6C' }
     ])
 
     const goToDetail = (item) => {
@@ -193,10 +176,48 @@ export default {
       }
     }
 
+    // 获取热门文章数据
+    const fetchHotArticles = async () => {
+      try {
+        const res = await getWeeklyHotArticles()
+        if (res.code === 200 && res.data) {
+          hotArticles.value = res.data.map(item => ({
+            id: item.id,
+            title: item.title,
+            summary: item.description || item.reason || '热门文章推荐',
+            cover: item.fileUrl || item.coverUrl || 'https://via.placeholder.com/200x150?text=Hot',
+            category: item.tagName || '热门',
+            date: item.createTime ? item.createTime.split('T')[0] : ''
+          }))
+        }
+      } catch (error) {
+        console.error('获取热门文章失败：', error)
+      }
+    }
+
+    // 获取统计信息
+    const fetchStatistics = async () => {
+      try {
+        const res = await getStatistics()
+        if (res.code === 200 && res.data) {
+          stats.value = [
+            { label: '学习用户', value: res.data.userCount ?? 0, icon: 'UserFilled', color: '#409EFF' },
+            { label: '文章数量', value: res.data.articleCount ?? 0, icon: 'Reading', color: '#67C23A' },
+            { label: '视频数量', value: res.data.videoCount ?? 0, icon: 'VideoCamera', color: '#E6A23C' },
+            { label: '内容总数', value: res.data.contentCount ?? 0, icon: 'Collection', color: '#F56C6C' }
+          ]
+        }
+      } catch (error) {
+        console.error('获取统计信息失败：', error)
+      }
+    }
+
     // 组件挂载时获取数据
     onMounted(() => {
       fetchBanners()
       fetchRecommendations()
+      fetchHotArticles()
+      fetchStatistics()
     })
 
     return {
@@ -370,8 +391,10 @@ export default {
   margin-bottom: 12px;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .content-meta {

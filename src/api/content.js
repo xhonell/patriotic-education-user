@@ -117,3 +117,23 @@ export function getRecommendList() {
   })
 }
 
+/**
+ * 获取近一周热门文章列表
+ */
+export function getWeeklyHotArticles() {
+  return request({
+    url: '/server/recommend/weekly-hot-articles',
+    method: 'get'
+  })
+}
+
+/**
+ * 获取统计信息
+ */
+export function getStatistics() {
+  return request({
+    url: '/server/statistics/info',
+    method: 'get'
+  })
+}
+
