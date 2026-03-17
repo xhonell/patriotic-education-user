@@ -1,13 +1,13 @@
 import request from './request'
 
 /**
- * 获取文章列表
+ * 文章分页查询
  */
-export function getArticleList(params) {
+export function getArticleList(data) {
   return request({
-    url: '/content/articles',
-    method: 'get',
-    params
+    url: '/server/article/page',
+    method: 'post',
+    data
   })
 }
 
@@ -16,7 +16,7 @@ export function getArticleList(params) {
  */
 export function getArticleDetail(id) {
   return request({
-    url: `/content/article/${id}`,
+    url: `/server/article/detail/${id}`,
     method: 'get'
   })
 }

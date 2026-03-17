@@ -18,6 +18,14 @@
             <el-icon><Star /></el-icon>
             {{ article.likes }} 点赞
           </span>
+          <span class="meta-item" v-if="article.author">
+            <el-icon><User /></el-icon>
+            {{ article.author }}
+          </span>
+          <span class="meta-item" v-if="article.source">
+            <el-icon><Document /></el-icon>
+            {{ article.source }}
+          </span>
         </div>
       </div>
 
@@ -116,6 +124,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getArticleDetail } from '@/api/content'
 
 export default {
   name: 'ArticleDetail',
@@ -127,29 +136,16 @@ export default {
     const newComment = ref('')
 
     const article = reactive({
-      id: 1,
-      title: '新中国成立的伟大历程',
-      category: '历史',
-      publishDate: '2025-10-15',
-      views: 1250,
-      likes: 89,
-      cover: 'https://via.placeholder.com/1200x600?text=Article+Cover',
-      content: `
-        <h2>前言</h2>
-        <p>1949年10月1日，中华人民共和国成立，开启了中国历史的新纪元。新中国的成立，是中国共产党领导中国人民经过28年浴血奋战取得的伟大胜利。</p>
-        
-        <h2>开国大典</h2>
-        <p>1949年10月1日下午3时，毛泽东主席在天安门城楼上庄严宣告："中华人民共和国中央人民政府今天成立了！"这一刻，标志着中国人民从此站起来了。</p>
-        
-        <h2>历史意义</h2>
-        <p>新中国的成立，结束了一百多年来帝国主义、封建主义、官僚资本主义对中国人民的压迫和剥削，中国人民真正成为国家的主人。</p>
-        
-        <h2>伟大成就</h2>
-        <p>新中国成立以来，在中国共产党的领导下，中国人民创造了世所罕见的经济快速发展和社会长期稳定两大奇迹，中华民族迎来了从站起来、富起来到强起来的伟大飞跃。</p>
-        
-        <h2>结语</h2>
-        <p>回顾历史，我们倍加珍惜今天的幸福生活。作为新时代的青少年，我们要继承和发扬革命先辈的优良传统，为实现中华民族伟大复兴的中国梦而努力奋斗！</p>
-      `
+      id: null,
+      title: '',
+      category: '',
+      publishDate: '',
+      views: 0,
+      likes: 0,
+      cover: '',
+      content: '',
+      author: '',
+      source: ''
     })
 
     const comments = reactive([
@@ -217,6 +213,36 @@ export default {
       ElMessage.success('分享链接已复制到剪贴板')
     }
 
+    const formatPublishDate = (value) => {
+      if (!value) return ''
+      if (typeof value === 'string') return value.replace('T', ' ')
+      if (value instanceof Date) return value.toLocaleString('zh-CN')
+      return String(value)
+    }
+
+    const fetchArticleDetail = async () => {
+      try {
+        const id = route.params.id
+        if (!id) return
+        const res = await getArticleDetail(id)
+        if (res.code === 200 && res.data) {
+          const data = res.data
+          article.id = data.id
+          article.title = data.title || ''
+          article.category = data.categoryName || '未分类'
+          article.publishDate = formatPublishDate(data.createTime)
+          article.views = data.viewCount || 0
+          article.likes = data.likeCount || 0
+          article.cover = data.fileUrl || data.coverUrl || 'https://via.placeholder.com/1200x600?text=Article'
+          article.content = data.content || ''
+          article.author = data.author || ''
+          article.source = data.source || ''
+        }
+      } catch (error) {
+        console.error('获取文章详情失败：', error)
+      }
+    }
+
     const handleComment = () => {
       if (!newComment.value.trim()) {
         ElMessage.warning('请输入评论内容')
@@ -241,14 +267,11 @@ export default {
     }
 
     const handleImageError = (e) => {
-      e.target.src = 'https://via.placeholder.com/400x300?text=Image'
+      e.target.src = 'https://via.placeholder.com/400x300?text=Article'
     }
 
     onMounted(() => {
-      // 模拟学习完成后获得积分
-      setTimeout(() => {
-        ElMessage.success('恭喜完成学习！+20积分')
-      }, 5000)
+      fetchArticleDetail()
     })
 
     return {
@@ -264,7 +287,8 @@ export default {
       handleShare,
       handleComment,
       goToArticle,
-      handleImageError
+      handleImageError,
+      fetchArticleDetail
     }
   }
 }
@@ -326,17 +350,70 @@ export default {
   line-height: 1.8;
   color: #333;
   margin-bottom: 32px;
+  overflow-x: hidden;
 }
 
-.article-content h2 {
-  font-size: 24px;
-  margin: 32px 0 16px;
-  color: #333;
+.article-content * {
+  box-sizing: border-box;
 }
 
 .article-content p {
-  margin-bottom: 16px;
+  margin: 0 0 16px;
   text-indent: 2em;
+}
+
+.article-content h1,
+.article-content h2,
+.article-content h3,
+.article-content h4,
+.article-content h5,
+.article-content h6 {
+  margin: 24px 0 12px;
+  line-height: 1.4;
+  font-weight: 600;
+  text-align: center;
+}
+
+.article-content h1 {
+  font-size: 22px;
+}
+
+.article-content ul,
+.article-content ol {
+  margin: 0 0 16px 24px;
+  padding: 0;
+}
+
+.article-content li {
+  margin: 6px 0;
+}
+
+.article-content blockquote {
+  margin: 16px 0;
+  padding: 8px 16px;
+  border-left: 4px solid #e5e5e5;
+  background: #fafafa;
+  color: #666;
+}
+
+.article-content img {
+  max-width: 100% !important;
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+  margin: 12px auto;
+  object-fit: contain;
+}
+
+.article-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.article-content table th,
+.article-content table td {
+  border: 1px solid #eee;
+  padding: 8px 12px;
 }
 
 .article-actions {
@@ -446,6 +523,7 @@ export default {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
 }
 

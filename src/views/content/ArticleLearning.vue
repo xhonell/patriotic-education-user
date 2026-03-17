@@ -50,8 +50,7 @@
           </div>
           <div class="article-body">
             <div class="article-tags">
-              <el-tag size="small" :type="getCategoryType(article.category)">{{ article.category }}</el-tag>
-              <el-tag size="small" type="info">{{ getDifficultyText(article.difficulty) }}</el-tag>
+              <el-tag size="small" type="info">{{ article.tagName || '未标签' }}</el-tag>
             </div>
             <h3 class="article-title">{{ article.title }}</h3>
             <p class="article-summary">{{ article.summary }}</p>
@@ -85,8 +84,9 @@
 </template>
 
 <script>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getArticleList } from '@/api/content'
 
 export default {
   name: 'ArticleLearning',
@@ -101,112 +101,68 @@ export default {
 
     const currentPage = ref(1)
     const pageSize = ref(9)
-    const total = ref(100)
+    const total = ref(0)
 
-    const articles = reactive([
-      {
-        id: 1,
-        title: '新中国成立的伟大历程',
-        summary: '回顾新中国成立以来的辉煌历史，感受祖国的强大',
-        cover: 'https://via.placeholder.com/400x300?text=Article+1',
-        category: '历史',
-        difficulty: 'easy',
-        views: 1250,
-        likes: 89,
-        points: 20
-      },
-      {
-        id: 2,
-        title: '科技强国之路',
-        summary: '探索中国科技创新的发展历程，见证中国智造的崛起',
-        cover: 'https://via.placeholder.com/400x300?text=Article+2',
-        category: '科技',
-        difficulty: 'medium',
-        views: 980,
-        likes: 72,
-        points: 25
-      },
-      {
-        id: 3,
-        title: '抗美援朝战争中的英雄事迹',
-        summary: '回顾那段波澜壮阔的历史，致敬最可爱的人',
-        cover: 'https://via.placeholder.com/400x300?text=Article+3',
-        category: '英雄人物',
-        difficulty: 'easy',
-        views: 1560,
-        likes: 123,
-        points: 20
-      },
-      {
-        id: 4,
-        title: '中华优秀传统文化传承',
-        summary: '感受五千年文明的魅力，传承中华文化瑰宝',
-        cover: 'https://via.placeholder.com/400x300?text=Article+4',
-        category: '文化',
-        difficulty: 'medium',
-        views: 850,
-        likes: 65,
-        points: 25
-      },
-      {
-        id: 5,
-        title: '改革开放四十年的伟大成就',
-        summary: '见证中国改革开放的历史进程和辉煌成就',
-        cover: 'https://via.placeholder.com/400x300?text=Article+5',
-        category: '历史',
-        difficulty: 'hard',
-        views: 2100,
-        likes: 178,
-        points: 30
-      },
-      {
-        id: 6,
-        title: '航天精神：从东方红到天宫',
-        summary: '探索中国航天事业的发展历程和伟大成就',
-        cover: 'https://via.placeholder.com/400x300?text=Article+6',
-        category: '科技',
-        difficulty: 'medium',
-        views: 1680,
-        likes: 142,
-        points: 25
-      }
-    ])
+    const articles = ref([])
 
-    const getCategoryType = (category) => {
-      const typeMap = {
-        '历史': 'danger',
-        '科技': 'success',
-        '文化': 'warning',
-        '英雄人物': 'primary'
-      }
-      return typeMap[category] || ''
+
+    const sortByMap = {
+      latest: 1,
+      likes: 2,
+      views: 3
     }
 
-    const getDifficultyText = (difficulty) => {
-      const textMap = {
-        'easy': '入门',
-        'medium': '进阶',
-        'hard': '深入'
+    const buildPageRequest = () => ({
+      page: currentPage.value,
+      pageSize: pageSize.value,
+      categoryId: filterForm.category || undefined,
+      sortBy: sortByMap[filterForm.sort] || 1
+    })
+
+    const fetchArticles = async () => {
+      try {
+        const res = await getArticleList(buildPageRequest())
+        if (res.code === 200 && res.data) {
+          const data = res.data
+          total.value = data.total || 0
+          articles.value = (data.articles || []).map(item => ({
+            id: item.id,
+            title: item.title,
+            summary: item.description || item.reason || '精彩文章推荐',
+            cover: item.fileUrl || item.coverUrl || 'https://via.placeholder.com/400x300?text=Article',
+            tagName: item.tagName || '',
+            views: item.viewCount || 0,
+            likes: item.likeCount || 0,
+            points: item.difficultyScore ?? (item.score ? Math.round(item.score) : 20)
+          }))
+        }
+      } catch (error) {
+        console.error('获取文章列表失败：', error)
       }
-      return textMap[difficulty] || ''
     }
 
     const handleSearch = () => {
-      console.log('搜索', filterForm)
+      currentPage.value = 1
+      fetchArticles()
     }
 
     const handleReset = () => {
       filterForm.category = ''
       filterForm.difficulty = ''
       filterForm.sort = 'latest'
+      currentPage.value = 1
+      fetchArticles()
     }
 
     const handleSizeChange = (val) => {
       pageSize.value = val
+      currentPage.value = 1
+      fetchArticles()
     }
 
     const handleCurrentChange = (val) => {
       currentPage.value = val
+      fetchArticles()
     }
 
     const goToDetail = (id) => {
@@ -214,8 +170,12 @@ export default {
     }
 
     const handleImageError = (e) => {
-      e.target.src = 'https://via.placeholder.com/400x300?text=Image'
+      e.target.src = 'https://via.placeholder.com/400x300?text=Article'
     }
+
+    onMounted(() => {
+      fetchArticles()
+    })
 
     return {
       filterForm,
@@ -223,8 +183,6 @@ export default {
       pageSize,
       total,
       articles,
-      getCategoryType,
-      getDifficultyText,
       handleSearch,
       handleReset,
       handleSizeChange,
@@ -324,6 +282,7 @@ export default {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
 }
 
