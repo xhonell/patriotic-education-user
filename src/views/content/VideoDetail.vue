@@ -8,11 +8,13 @@
           <div class="video-player">
             <video
               v-if="video.videoUrl"
+              ref="videoRef"
               :src="video.videoUrl"
               class="video-element"
               controls
               preload="metadata"
               poster=""
+              @timeupdate="handleVideoTimeUpdate"
             />
             <div v-else class="video-placeholder">
               <el-icon :size="80" color="#fff"><VideoPlay /></el-icon>
@@ -54,11 +56,11 @@
 
           <!-- 操作按钮 -->
           <div class="video-actions">
-            <el-button type="primary" size="large" @click="handleLike" :disabled="hasLiked">
+            <el-button type="primary" size="large" @click="handleLike">
               <el-icon><StarFilled /></el-icon>
               {{ hasLiked ? '已点赞' : '点赞' }}
             </el-button>
-            <el-button size="large" @click="handleCollect" :disabled="hasCollected">
+            <el-button size="large" @click="handleCollect">
               <el-icon><Collection /></el-icon>
               {{ hasCollected ? '已收藏' : '收藏' }}
             </el-button>
@@ -73,7 +75,7 @@
         <el-card class="comment-card">
           <template #header>
             <div class="card-header">
-              <span>评论区 ({{ comments.length }})</span>
+              <span>评论区 ({{ commentTotal }})</span>
             </div>
           </template>
 
@@ -97,12 +99,41 @@
               <div class="comment-content">
                 <div class="comment-header">
                   <span class="comment-user">{{ comment.username }}</span>
+                  <el-tag
+                    v-if="comment.isMine"
+                    size="small"
+                    type="success"
+                    effect="plain"
+                    style="margin-left: 8px"
+                  >本人</el-tag>
                   <span class="comment-date">{{ comment.date }}</span>
                 </div>
                 <p class="comment-text">{{ comment.content }}</p>
+                <div class="comment-actions">
+                  <el-button
+                    v-if="canDeleteComment(comment)"
+                    type="text"
+                    size="small"
+                    @click="handleDeleteComment(comment.id)"
+                  >
+                    删除
+                  </el-button>
+                </div>
               </div>
             </div>
           </div>
+
+          <el-pagination
+            v-model:current-page="commentPage"
+            v-model:page-size="commentPageSize"
+            :total="commentTotal"
+            :page-sizes="[5, 10, 20]"
+            layout="total, sizes, prev, pager, next"
+            @size-change="() => { commentPage = 1; fetchComments() }"
+            @current-change="fetchComments"
+            class="pagination"
+            style="margin-top: 16px"
+          />
         </el-card>
       </el-col>
 
@@ -135,19 +166,29 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getVideoDetailById, getRecommendVideos } from '@/api/content'
+import { deleteComment, getCommentPage, publishComment } from '@/api/comment'
+import {
+  getInteractionStatus,
+  handleCollect as handleCollectApi,
+  handleLike as handleLikeApi
+} from '@/api/like'
+import { addPoints } from '@/api/points'
+import { useUserStore } from '@/stores/user'
 
 export default {
   name: 'VideoDetail',
   setup() {
     const route = useRoute()
     const router = useRouter()
+    const userStore = useUserStore()
     const hasLiked = ref(false)
     const hasCollected = ref(false)
     const newComment = ref('')
+    const videoRef = ref(null)
 
     const video = reactive({
       id: null,
@@ -159,25 +200,14 @@ export default {
       duration: '00:00',
       description: '',
       videoUrl: '',
-      coverUrl: ''
+      coverUrl: '',
+      learningPoints: 30
     })
 
-    const comments = reactive([
-      {
-        id: 1,
-        username: '爱国青年',
-        avatar: 'https://via.placeholder.com/100',
-        content: '看完这个纪录片，深深感受到改革开放的伟大意义，为祖国的发展感到骄傲！',
-        date: '2025-10-17 10:30'
-      },
-      {
-        id: 2,
-        username: '历史爱好者',
-        avatar: 'https://via.placeholder.com/100',
-        content: '非常震撼的纪录片，让我更加了解了改革开放的历史进程！',
-        date: '2025-10-16 15:20'
-      }
-    ])
+    const commentTotal = ref(0)
+    const commentPage = ref(1)
+    const commentPageSize = ref(10)
+    const comments = ref([])
 
     const recommendations = ref([])
 
@@ -201,37 +231,148 @@ export default {
       return textMap[category] || ''
     }
 
-    const handleLike = () => {
-      hasLiked.value = true
-      video.likes++
-      ElMessage.success('点赞成功！+5积分')
+    const grantPoints = async ({ sourceType, sourceId, remark, points }) => {
+      try {
+        const res = await addPoints({ sourceType, sourceId: String(sourceId), remark, points })
+        if (res.code === 200 && res.data) {
+          const addVal = res.data.changePoints ?? points ?? 0
+          ElMessage.success(`${remark} +${addVal} 积分，当前积分：${res.data.afterPoints ?? '--'}`)
+        }
+      } catch (e) {
+        console.error('增加积分失败：', e)
+      }
     }
 
-    const handleCollect = () => {
-      hasCollected.value = true
-      ElMessage.success('收藏成功！')
+    const handleLike = async () => {
+      try {
+        const operation = hasLiked.value ? 0 : 1
+        await handleLikeApi({
+          contentId: Number(route.params.id),
+          operation
+        })
+        hasLiked.value = !hasLiked.value
+        video.likes = Math.max(0, video.likes + (operation === 1 ? 1 : -1))
+        if (operation === 1) {
+          await grantPoints({
+            sourceType: '4',
+            sourceId: route.params.id,
+            remark: '点赞内容',
+            points: 5
+          })
+        }
+        ElMessage.success(operation === 1 ? '点赞成功！' : '已取消点赞')
+      } catch (e) {
+        console.error('点赞操作失败：', e)
+      }
+    }
+
+    const handleCollect = async () => {
+      try {
+        const operation = hasCollected.value ? 0 : 1
+        await handleCollectApi({
+          contentId: Number(route.params.id),
+          operation
+        })
+        hasCollected.value = !hasCollected.value
+        if (operation === 1) {
+          await grantPoints({
+            sourceType: '5',
+            sourceId: route.params.id,
+            remark: '收藏内容',
+            points: 5
+          })
+        }
+        ElMessage.success(operation === 1 ? '收藏成功！' : '已取消收藏')
+      } catch (e) {
+        console.error('收藏操作失败：', e)
+      }
     }
 
     const handleShare = () => {
       ElMessage.success('分享链接已复制到剪贴板')
     }
 
-    const handleComment = () => {
+    const formatPublishDate = (value) => {
+      if (!value) return ''
+      if (typeof value === 'string') return value.replace('T', ' ')
+      if (value instanceof Date) return value.toLocaleString('zh-CN')
+      return String(value)
+    }
+
+    const normalizeComment = (item) => {
+      const itemUserId = item.userId ?? item.createBy ?? item.uid ?? item.createUserId ?? null
+      const uid = userStore?.userInfo?.id
+      const isMine = uid != null && itemUserId != null && String(uid) === String(itemUserId)
+
+      return {
+        id: item.id,
+        userId: itemUserId,
+        isMine,
+        username: item.username || item.userName || item.nickName || item.createName || '匿名用户',
+        avatar: item.avatarUrl || item.avatar || item.userAvatar || '',
+        content: item.content || item.comment || '',
+        date: formatPublishDate(item.createTime || item.createAt || item.createdAt || item.time),
+        likes: item.likeCount || item.likes || 0
+      }
+    }
+
+    const buildCommentPageRequest = () => ({
+      page: commentPage.value,
+      pageSize: commentPageSize.value,
+      contentId: Number(route.params.id),
+      status: 1
+    })
+
+    const fetchComments = async () => {
+      try {
+        const res = await getCommentPage(buildCommentPageRequest())
+        if (res.code === 200 && res.data) {
+          const data = res.data
+          commentTotal.value = data.total || 0
+          comments.value = (data.list || data.records || []).map(normalizeComment)
+        }
+      } catch (e) {
+        console.error('获取视频评论失败：', e)
+      }
+    }
+
+    const handleComment = async () => {
       if (!newComment.value.trim()) {
         ElMessage.warning('请输入评论内容')
         return
       }
 
-      comments.unshift({
-        id: Date.now(),
-        username: '当前用户',
-        avatar: 'https://via.placeholder.com/100',
-        content: newComment.value,
-        date: new Date().toLocaleString('zh-CN')
-      })
+      try {
+        const content = newComment.value.trim()
+        await publishComment({
+          contentId: Number(route.params.id),
+          content
+        })
+        await grantPoints({
+          sourceType: '3',
+          sourceId: route.params.id,
+          remark: '发表评论',
+          points: 10
+        })
+        newComment.value = ''
+        commentPage.value = 1
+        ElMessage.success('评论成功！')
+        await fetchComments()
+      } catch (e) {
+        console.error('发表评论失败：', e)
+      }
+    }
 
-      newComment.value = ''
-      ElMessage.success('评论成功！+10积分')
+    const canDeleteComment = (comment) => Boolean(comment?.isMine)
+
+    const handleDeleteComment = async (id) => {
+      try {
+        await deleteComment(id)
+        ElMessage.success('删除成功')
+        await fetchComments()
+      } catch (e) {
+        console.error('删除评论失败：', e)
+      }
     }
 
     const goToVideo = (id) => {
@@ -263,9 +404,25 @@ export default {
           video.description = data.description || data.reason || ''
           video.videoUrl = data.coverUrl || ''
           video.coverUrl = data.fileUrl || ''
+          video.learningPoints =
+            data.difficultyScore ?? data.learningPoints ?? data.learnPoints ?? data.points ?? data.pointValue ?? 30
         }
       } catch (error) {
         console.error('获取视频详情失败：', error)
+      }
+    }
+
+    const fetchInteractionStatus = async () => {
+      try {
+        const contentId = Number(route.params.id)
+        if (!contentId) return
+        const res = await getInteractionStatus({ contentId })
+        if (res.code === 200 && res.data) {
+          hasLiked.value = Boolean(res.data.isLiked)
+          hasCollected.value = Boolean(res.data.isCollected)
+        }
+      } catch (error) {
+        console.error('获取互动状态失败：', error)
       }
     }
 
@@ -294,25 +451,65 @@ export default {
       e.target.src = 'https://via.placeholder.com/200x150?text=Video'
     }
 
+    const grantedLearningPoints = ref(false)
+
+    const grantLearningPointsOnce = async () => {
+      if (grantedLearningPoints.value) return
+      const id = route.params.id
+      if (!id) return
+      grantedLearningPoints.value = true
+      await grantPoints({
+        sourceType: '2',
+        sourceId: id,
+        remark: '视频学习',
+        points: video.learningPoints
+      })
+    }
+
+    const handleVideoTimeUpdate = () => {
+      const el = videoRef.value
+      if (!el || !el.duration || Number.isNaN(el.duration)) return
+      if (el.currentTime >= el.duration / 3) {
+        grantLearningPointsOnce()
+      }
+    }
+
     onMounted(() => {
       fetchVideoDetail()
+      fetchInteractionStatus()
       fetchRecommendations()
+      fetchComments()
+    })
+
+    onBeforeUnmount(() => {
+      const el = videoRef.value
+      if (el) {
+        el.removeEventListener('timeupdate', handleVideoTimeUpdate)
+      }
     })
 
     return {
       video,
       comments,
+      commentTotal,
+      commentPage,
+      commentPageSize,
       recommendations,
       hasLiked,
       hasCollected,
       newComment,
+      videoRef,
       getCategoryType,
       getCategoryText,
       handleLike,
       handleCollect,
       handleShare,
       handleComment,
+      handleVideoTimeUpdate,
+      canDeleteComment,
+      handleDeleteComment,
       goToVideo,
+      fetchComments,
       handleImageError
     }
   }

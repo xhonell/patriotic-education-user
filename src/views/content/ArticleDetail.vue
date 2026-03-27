@@ -39,11 +39,11 @@
 
       <!-- 文章操作 -->
       <div class="article-actions">
-        <el-button type="primary" size="large" @click="handleLike" :disabled="hasLiked">
+        <el-button type="primary" size="large" @click="handleLike">
           <el-icon><StarFilled /></el-icon>
           {{ hasLiked ? '已点赞' : '点赞' }}
         </el-button>
-        <el-button size="large" @click="handleCollect" :disabled="hasCollected">
+        <el-button size="large" @click="handleCollect">
           <el-icon><Collection /></el-icon>
           {{ hasCollected ? '已收藏' : '收藏' }}
         </el-button>
@@ -58,7 +58,7 @@
     <el-card class="comment-card">
       <template #header>
         <div class="card-header">
-          <span>评论区 ({{ comments.length }})</span>
+          <span>评论区 ({{ commentTotal }})</span>
         </div>
       </template>
 
@@ -82,22 +82,41 @@
           <div class="comment-content">
             <div class="comment-header">
               <span class="comment-user">{{ comment.username }}</span>
+              <el-tag
+                v-if="comment.isMine"
+                size="small"
+                type="success"
+                effect="plain"
+                style="margin-left: 8px"
+              >本人</el-tag>
               <span class="comment-date">{{ comment.date }}</span>
             </div>
             <p class="comment-text">{{ comment.content }}</p>
             <div class="comment-actions">
-              <el-button type="text" size="small">
-                <el-icon><ChatDotRound /></el-icon>
-                回复
-              </el-button>
-              <el-button type="text" size="small">
-                <el-icon><Star /></el-icon>
-                {{ comment.likes }}
+              <el-button
+                v-if="canDeleteComment(comment)"
+                type="text"
+                size="small"
+                @click="handleDeleteComment(comment.id)"
+              >
+                删除
               </el-button>
             </div>
           </div>
         </div>
       </div>
+
+      <el-pagination
+        v-model:current-page="commentPage"
+        v-model:page-size="commentPageSize"
+        :total="commentTotal"
+        :page-sizes="[5, 10, 20]"
+        layout="total, sizes, prev, pager, next"
+        @size-change="() => { commentPage = 1; fetchComments() }"
+        @current-change="fetchComments"
+        class="pagination"
+        style="margin-top: 16px"
+      />
     </el-card>
 
     <!-- 推荐阅读 -->
@@ -121,16 +140,25 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getArticleDetail } from '@/api/content'
+import { deleteComment, getCommentPage, publishComment } from '@/api/comment'
+import {
+  getInteractionStatus,
+  handleCollect as handleCollectApi,
+  handleLike as handleLikeApi
+} from '@/api/like'
+import { addPoints } from '@/api/points'
+import { useUserStore } from '@/stores/user'
 
 export default {
   name: 'ArticleDetail',
   setup() {
     const route = useRoute()
     const router = useRouter()
+    const userStore = useUserStore()
     const hasLiked = ref(false)
     const hasCollected = ref(false)
     const newComment = ref('')
@@ -145,27 +173,14 @@ export default {
       cover: '',
       content: '',
       author: '',
-      source: ''
+      source: '',
+      learningPoints: 20
     })
 
-    const comments = reactive([
-      {
-        id: 1,
-        username: '小明同学',
-        avatar: 'https://via.placeholder.com/100',
-        content: '学习了这篇文章，深刻感受到新中国成立的不易，我们要倍加珍惜今天的幸福生活！',
-        date: '2025-10-17 10:30',
-        likes: 12
-      },
-      {
-        id: 2,
-        username: '爱国青年',
-        avatar: 'https://via.placeholder.com/100',
-        content: '革命先辈用鲜血和生命换来了今天的和平与幸福，我们要努力学习，报效祖国！',
-        date: '2025-10-16 15:20',
-        likes: 8
-      }
-    ])
+    const commentTotal = ref(0)
+    const commentPage = ref(1)
+    const commentPageSize = ref(10)
+    const comments = ref([])
 
     const recommendations = reactive([
       {
@@ -198,15 +213,61 @@ export default {
       return typeMap[category] || ''
     }
 
-    const handleLike = () => {
-      hasLiked.value = true
-      article.likes++
-      ElMessage.success('点赞成功！+5积分')
+    const grantPoints = async ({ sourceType, sourceId, remark, points }) => {
+      try {
+        const res = await addPoints({ sourceType, sourceId: String(sourceId), remark, points })
+        if (res.code === 200 && res.data) {
+          const addVal = res.data.changePoints ?? points ?? 0
+          ElMessage.success(`${remark} +${addVal} 积分，当前积分：${res.data.afterPoints ?? '--'}`)
+        }
+      } catch (e) {
+        console.error('增加积分失败：', e)
+      }
     }
 
-    const handleCollect = () => {
-      hasCollected.value = true
-      ElMessage.success('收藏成功！')
+    const handleLike = async () => {
+      try {
+        const operation = hasLiked.value ? 0 : 1
+        await handleLikeApi({
+          contentId: Number(route.params.id),
+          operation
+        })
+        hasLiked.value = !hasLiked.value
+        article.likes = Math.max(0, article.likes + (operation === 1 ? 1 : -1))
+        if (operation === 1) {
+          await grantPoints({
+            sourceType: '4',
+            sourceId: route.params.id,
+            remark: '点赞内容',
+            points: 5
+          })
+        }
+        ElMessage.success(operation === 1 ? '点赞成功！' : '已取消点赞')
+      } catch (e) {
+        console.error('点赞操作失败：', e)
+      }
+    }
+
+    const handleCollect = async () => {
+      try {
+        const operation = hasCollected.value ? 0 : 1
+        await handleCollectApi({
+          contentId: Number(route.params.id),
+          operation
+        })
+        hasCollected.value = !hasCollected.value
+        if (operation === 1) {
+          await grantPoints({
+            sourceType: '5',
+            sourceId: route.params.id,
+            remark: '收藏内容',
+            points: 5
+          })
+        }
+        ElMessage.success(operation === 1 ? '收藏成功！' : '已取消收藏')
+      } catch (e) {
+        console.error('收藏操作失败：', e)
+      }
     }
 
     const handleShare = () => {
@@ -237,9 +298,25 @@ export default {
           article.content = data.content || ''
           article.author = data.author || ''
           article.source = data.source || ''
+          article.learningPoints =
+            data.difficultyScore ?? data.learningPoints ?? data.learnPoints ?? data.points ?? data.pointValue ?? 20
         }
       } catch (error) {
         console.error('获取文章详情失败：', error)
+      }
+    }
+
+    const fetchInteractionStatus = async () => {
+      try {
+        const contentId = Number(route.params.id)
+        if (!contentId) return
+        const res = await getInteractionStatus({ contentId })
+        if (res.code === 200 && res.data) {
+          hasLiked.value = Boolean(res.data.isLiked)
+          hasCollected.value = Boolean(res.data.isCollected)
+        }
+      } catch (error) {
+        console.error('获取互动状态失败：', error)
       }
     }
 
@@ -248,18 +325,81 @@ export default {
         ElMessage.warning('请输入评论内容')
         return
       }
+      doPublishComment()
+    }
 
-      comments.unshift({
-        id: Date.now(),
-        username: '当前用户',
-        avatar: 'https://via.placeholder.com/100',
-        content: newComment.value,
-        date: new Date().toLocaleString('zh-CN'),
-        likes: 0
-      })
+    const normalizeComment = (item) => {
+      const itemUserId = item.userId ?? item.createBy ?? item.uid ?? item.createUserId ?? null
+      const uid = userStore?.userInfo?.id
+      const isMine = uid != null && itemUserId != null && String(uid) === String(itemUserId)
 
-      newComment.value = ''
-      ElMessage.success('评论成功！+10积分')
+      return {
+        id: item.id,
+        userId: itemUserId,
+        isMine,
+        username: item.username || item.userName || item.nickName || item.createName || '匿名用户',
+        avatar: item.avatarUrl || item.avatar || item.userAvatar || '',
+        content: item.content || item.comment || '',
+        date: formatPublishDate(item.createTime || item.createAt || item.createdAt || item.time),
+        likes: item.likeCount || item.likes || 0
+      }
+    }
+
+    const buildCommentPageRequest = () => ({
+      page: commentPage.value,
+      pageSize: commentPageSize.value,
+      contentId: Number(route.params.id),
+      // 只查正常评论；如果你后端用别的状态约定，改这里即可
+      status: 1
+      // userId: userStore.userInfo.id // 若需要“只看我的评论”，再打开
+    })
+
+    const fetchComments = async () => {
+      try {
+        const res = await getCommentPage(buildCommentPageRequest())
+        if (res.code === 200 && res.data) {
+          const data = res.data
+          commentTotal.value = data.total || 0
+          comments.value = (data.list || data.records || []).map(normalizeComment)
+        }
+      } catch (e) {
+        console.error('获取评论失败：', e)
+      }
+    }
+
+    const doPublishComment = async () => {
+      try {
+        const content = newComment.value.trim()
+        const id = route.params.id
+        await publishComment({
+          contentId: Number(id),
+          content
+        })
+        await grantPoints({
+          sourceType: '3',
+          sourceId: id,
+          remark: '发表评论',
+          points: 10
+        })
+        newComment.value = ''
+        ElMessage.success('评论成功！')
+        commentPage.value = 1
+        await fetchComments()
+      } catch (e) {
+        console.error('发表评论失败：', e)
+      }
+    }
+
+    const canDeleteComment = (comment) => Boolean(comment?.isMine)
+
+    const handleDeleteComment = async (id) => {
+      try {
+        await deleteComment(id)
+        ElMessage.success('删除成功')
+        await fetchComments()
+      } catch (e) {
+        console.error('删除评论失败：', e)
+      }
     }
 
     const goToArticle = (id) => {
@@ -270,13 +410,44 @@ export default {
       e.target.src = 'https://via.placeholder.com/400x300?text=Article'
     }
 
+    const grantedLearningPoints = ref(false)
+    let articleLearningTimer = null
+
+    const grantLearningPointsOnce = async () => {
+      if (grantedLearningPoints.value) return
+      const id = route.params.id
+      if (!id) return
+      grantedLearningPoints.value = true
+      await grantPoints({
+        sourceType: '1',
+        sourceId: id,
+        remark: '文章学习',
+        points: article.learningPoints
+      })
+    }
+
     onMounted(() => {
       fetchArticleDetail()
+      fetchInteractionStatus()
+      fetchComments()
+      articleLearningTimer = setTimeout(() => {
+        grantLearningPointsOnce()
+      }, 10000)
+    })
+
+    onBeforeUnmount(() => {
+      if (articleLearningTimer) {
+        clearTimeout(articleLearningTimer)
+        articleLearningTimer = null
+      }
     })
 
     return {
       article,
       comments,
+      commentTotal,
+      commentPage,
+      commentPageSize,
       recommendations,
       hasLiked,
       hasCollected,
@@ -286,9 +457,12 @@ export default {
       handleCollect,
       handleShare,
       handleComment,
+      canDeleteComment,
+      handleDeleteComment,
       goToArticle,
       handleImageError,
-      fetchArticleDetail
+      fetchArticleDetail,
+      fetchComments
     }
   }
 }

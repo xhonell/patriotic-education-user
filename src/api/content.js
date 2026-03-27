@@ -96,27 +96,7 @@ export function collectContent(data) {
   })
 }
 
-/**
- * 发表评论
- */
-export function addComment(data) {
-  return request({
-    url: '/content/comment',
-    method: 'post',
-    data
-  })
-}
-
-/**
- * 获取评论列表
- */
-export function getComments(params) {
-  return request({
-    url: '/content/comments',
-    method: 'get',
-    params
-  })
-}
+// 评论接口已迁移到 `src/api/comment.js`
 
 /**
  * 获取首页轮播图
