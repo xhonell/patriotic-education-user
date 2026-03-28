@@ -12,15 +12,15 @@
     <el-card class="filter-card" :body-style="{ padding: '20px' }">
       <el-radio-group v-model="activeCategory" @change="handleCategoryChange">
         <el-radio-button label="all">全部</el-radio-button>
-        <el-radio-button label="discuss">讨论</el-radio-button>
-        <el-radio-button label="share">分享</el-radio-button>
-        <el-radio-button label="question">问答</el-radio-button>
-        <el-radio-button label="activity">活动</el-radio-button>
+        <el-radio-button :label="1">讨论</el-radio-button>
+        <el-radio-button :label="2">问答</el-radio-button>
+        <el-radio-button :label="3">分享</el-radio-button>
+        <el-radio-button :label="4">活动</el-radio-button>
       </el-radio-group>
-      <el-select v-model="sortType" placeholder="排序方式" style="margin-left: 16px; width: 150px">
+      <el-select v-model="sortType" placeholder="排序方式" style="margin-left: 16px; width: 150px" @change="handleSortChange">
         <el-option label="最新发布" value="latest" />
         <el-option label="最多回复" value="replies" />
-        <el-option label="最多点赞" value="likes" />
+        <el-option label="最多观看" value="views" />
       </el-select>
     </el-card>
 
@@ -42,6 +42,7 @@
             <div class="post-footer">
               <div class="post-author">
                 <span class="author-name">{{ post.author.name }}</span>
+                <span v-if="post.location" class="post-location">{{ post.location }}</span>
                 <span class="post-time">{{ post.time }}</span>
               </div>
               <div class="post-stats">
@@ -56,11 +57,13 @@
 
       <!-- 分页 -->
       <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
+        :current-page="currentPage"
+        :page-size="pageSize"
         :total="total"
         :page-sizes="[10, 20, 50]"
         layout="total, sizes, prev, pager, next"
+        @update:current-page="handleCurrentChange"
+        @update:page-size="handleSizeChange"
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
         class="pagination"
@@ -72,10 +75,10 @@
       <el-form :model="postForm" :rules="postRules" ref="postFormRef" label-width="80px">
         <el-form-item label="分类" prop="category">
           <el-select v-model="postForm.category" placeholder="请选择分类">
-            <el-option label="讨论" value="discuss" />
-            <el-option label="分享" value="share" />
-            <el-option label="问答" value="question" />
-            <el-option label="活动" value="activity" />
+            <el-option label="讨论" :value="1" />
+            <el-option label="问答" :value="2" />
+            <el-option label="分享" :value="3" />
+            <el-option label="活动" :value="4" />
           </el-select>
         </el-form-item>
         <el-form-item label="标题" prop="title">
@@ -101,9 +104,10 @@
 </template>
 
 <script>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getTopicPage, publishTopic } from '@/api/community'
 
 export default {
   name: 'Forum',
@@ -113,13 +117,13 @@ export default {
     const sortType = ref('latest')
     const currentPage = ref(1)
     const pageSize = ref(10)
-    const total = ref(100)
+    const total = ref(0)
     const showPostDialog = ref(false)
     const submitting = ref(false)
     const postFormRef = ref(null)
 
     const postForm = reactive({
-      category: '',
+      category: null,
       title: '',
       content: ''
     })
@@ -138,83 +142,94 @@ export default {
       ]
     }
 
-    const posts = reactive([
-      {
-        id: 1,
-        category: 'share',
-        title: '学习《改革开放四十年》纪录片的心得体会',
-        content: '今天看完了这部纪录片，深深感受到改革开放给中国带来的翻天覆地的变化...',
-        author: { name: '爱国青年', avatar: 'https://via.placeholder.com/100' },
-        time: '2小时前',
-        views: 580,
-        replies: 45,
-        likes: 89
-      },
-      {
-        id: 2,
-        category: 'discuss',
-        title: '讨论：新时代青年如何传承爱国主义精神',
-        content: '作为新时代的青年，我们应该如何在日常生活中践行爱国主义精神？欢迎大家分享自己的想法...',
-        author: { name: '学习之星', avatar: 'https://via.placeholder.com/100' },
-        time: '5小时前',
-        views: 1200,
-        replies: 98,
-        likes: 156
-      },
-      {
-        id: 3,
-        category: 'question',
-        title: '如何系统地学习中国近现代史？',
-        content: '想要系统地学习中国近现代史，有什么好的学习方法和资料推荐吗？',
-        author: { name: '历史爱好者', avatar: 'https://via.placeholder.com/100' },
-        time: '1天前',
-        views: 420,
-        replies: 32,
-        likes: 67
-      },
-      {
-        id: 4,
-        category: 'activity',
-        title: '【活动】本月学习之星评选开始啦！',
-        content: '本月学习之星评选活动正式启动，快来参与吧！评选标准包括学习时长、互动参与度等...',
-        author: { name: '管理员', avatar: 'https://via.placeholder.com/100' },
-        time: '2天前',
-        views: 2500,
-        replies: 180,
-        likes: 320
-      }
-    ])
+    const posts = ref([])
 
     const getCategoryType = (category) => {
       const typeMap = {
-        'discuss': 'primary',
-        'share': 'success',
-        'question': 'warning',
-        'activity': 'danger'
+        1: 'primary',
+        2: 'warning',
+        3: 'success',
+        4: 'danger'
       }
-      return typeMap[category] || ''
+      return typeMap[Number(category)] || ''
     }
 
     const getCategoryText = (category) => {
       const textMap = {
-        'discuss': '讨论',
-        'share': '分享',
-        'question': '问答',
-        'activity': '活动'
+        1: '讨论',
+        2: '问答',
+        3: '分享',
+        4: '活动'
       }
-      return textMap[category] || ''
+      return textMap[Number(category)] || '未分类'
+    }
+
+    const buildOrder = () => {
+      const orderMap = {
+        latest: 'create_time',
+        replies: 'reply_count',
+        views: 'view_count'
+      }
+      return {
+        orderBy: orderMap[sortType.value] || 'create_time',
+        orderType: 'DESC'
+      }
+    }
+
+    const fetchTopics = async () => {
+      try {
+        const order = buildOrder()
+        const res = await getTopicPage({
+          page: currentPage.value,
+          pageSize: pageSize.value,
+          category: activeCategory.value === 'all' ? undefined : activeCategory.value,
+          orderBy: order.orderBy,
+          orderType: order.orderType
+        })
+        if (res.code === 200 && res.data) {
+          const pageData = res.data
+          total.value = pageData.total || 0
+          posts.value = (pageData.list || []).map(item => ({
+            id: item.id,
+            category: Number(item.category) || 1,
+            title: item.title,
+            content: item.content || '',
+            author: {
+              name: item.userName || '匿名用户',
+              avatar: item.avatarUrl || 'https://via.placeholder.com/100'
+            },
+            location: item.location || '',
+            status: Number(item.status),
+            time: item.createTime || '',
+            views: item.viewCount || 0,
+            replies: item.replyCount || 0,
+            likes: item.likeCount || 0
+          }))
+        }
+      } catch (error) {
+        console.error('获取话题分页失败：', error)
+      }
     }
 
     const handleCategoryChange = () => {
-      console.log('切换分类', activeCategory.value)
+      currentPage.value = 1
+      fetchTopics()
+    }
+
+    const handleSortChange = () => {
+      currentPage.value = 1
+      fetchTopics()
     }
 
     const handleSizeChange = (val) => {
       pageSize.value = val
+      currentPage.value = 1
+      fetchTopics()
     }
 
     const handleCurrentChange = (val) => {
       currentPage.value = val
+      fetchTopics()
     }
 
     const goToTopic = (id) => {
@@ -225,23 +240,34 @@ export default {
       if (!postFormRef.value) return
 
       await postFormRef.value.validate(async (valid) => {
-        if (valid) {
-          submitting.value = true
-
-          // 模拟提交
-          setTimeout(() => {
-            ElMessage.success('发布成功！+15积分')
+        if (!valid) return
+        submitting.value = true
+        try {
+          const res = await publishTopic({
+            category: postForm.category,
+            title: postForm.title,
+            content: postForm.content
+          })
+          if (res.code === 200) {
+            ElMessage.success('发布成功')
             showPostDialog.value = false
-            submitting.value = false
-
-            // 重置表单
-            postForm.category = ''
+            postForm.category = null
             postForm.title = ''
             postForm.content = ''
-          }, 1000)
+            currentPage.value = 1
+            fetchTopics()
+          }
+        } catch (error) {
+          console.error('发布话题失败：', error)
+        } finally {
+          submitting.value = false
         }
       })
     }
+
+    onMounted(() => {
+      fetchTopics()
+    })
 
     return {
       activeCategory,
@@ -258,6 +284,7 @@ export default {
       getCategoryType,
       getCategoryText,
       handleCategoryChange,
+      handleSortChange,
       handleSizeChange,
       handleCurrentChange,
       goToTopic,
@@ -337,6 +364,7 @@ export default {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
 }
 
@@ -355,6 +383,10 @@ export default {
 .author-name {
   color: #409EFF;
   font-weight: bold;
+}
+
+.post-location {
+  color: #67C23A;
 }
 
 .post-time {

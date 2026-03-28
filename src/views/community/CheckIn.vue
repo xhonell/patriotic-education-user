@@ -90,31 +90,8 @@
                 <el-icon :size="32" color="#F56C6C"><TrophyBase /></el-icon>
               </div>
               <div class="reward-points">+{{ reward.points }}积分</div>
-              <el-tag v-if="reward.claimed" type="info" size="small">已领取</el-tag>
-              <el-tag v-else-if="reward.available" type="success" size="small">可领取</el-tag>
-            </div>
-          </div>
-        </el-card>
-
-        <!-- 签到排行 -->
-        <el-card class="ranking-card">
-          <template #header>
-            <div class="card-header">
-              <span>签到排行榜</span>
-            </div>
-          </template>
-          <div class="ranking-list">
-            <div class="ranking-item" v-for="(user, index) in topCheckinUsers" :key="user.id">
-              <div class="rank-number" :class="'rank-' + (index + 1)">
-                {{ index + 1 }}
-              </div>
-              <el-avatar :src="user.avatar" :size="32">
-                <el-icon><User /></el-icon>
-              </el-avatar>
-              <div class="user-info">
-                <div class="user-name">{{ user.username }}</div>
-                <div class="user-days">连续{{ user.days }}天</div>
-              </div>
+              <el-tag v-if="reward.claimed" type="info" size="small">已达成</el-tag>
+              <el-tag v-else-if="reward.available" type="success" size="small">即将达成</el-tag>
             </div>
           </div>
         </el-card>
@@ -124,8 +101,10 @@
 </template>
 
 <script>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { signToday, signMonth } from '@/api/community'
+import { addPoints } from '@/api/points'
 
 export default {
   name: 'CheckIn',
@@ -134,34 +113,34 @@ export default {
     const loading = ref(false)
 
     const checkinData = reactive({
-      continuousDays: 7,
-      totalDays: 45,
-      totalPoints: 380
+      continuousDays: 0,
+      totalDays: 0,
+      totalPoints: 0
     })
 
     const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
     const calendarDays = reactive([])
 
-    const rewards = reactive([
-      { day: 1, points: 5, claimed: true, available: false },
-      { day: 2, points: 5, claimed: true, available: false },
-      { day: 3, points: 5, claimed: true, available: false },
-      { day: 4, points: 5, claimed: true, available: false },
-      { day: 5, points: 5, claimed: true, available: false },
-      { day: 6, points: 5, claimed: true, available: false },
-      { day: 7, points: 50, claimed: false, available: true },
-      { day: 14, points: 100, claimed: false, available: false },
-      { day: 30, points: 300, claimed: false, available: false }
-    ])
+    const rewardRules = [
+      { day: 1, points: 10 },
+      { day: 2, points: 10 },
+      { day: 3, points: 15 },
+      { day: 4, points: 15 },
+      { day: 5, points: 20 },
+      { day: 7, points: 30 },
+      { day: 14, points: 50 },
+      { day: 30, points: 100 }
+    ]
 
-    const topCheckinUsers = reactive([
-      { id: 1, username: '签到达人', avatar: 'https://via.placeholder.com/100', days: 365 },
-      { id: 2, username: '坚持不懈', avatar: 'https://via.placeholder.com/100', days: 280 },
-      { id: 3, username: '每日打卡', avatar: 'https://via.placeholder.com/100', days: 210 },
-      { id: 4, username: '学习之星', avatar: 'https://via.placeholder.com/100', days: 180 },
-      { id: 5, username: '奋斗者', avatar: 'https://via.placeholder.com/100', days: 156 }
-    ])
+    const rewards = computed(() => {
+      return rewardRules.map(rule => ({
+        day: rule.day,
+        points: rule.points,
+        claimed: checkinData.totalDays >= rule.day,
+        available: checkinData.totalDays + 1 === rule.day
+      }))
+    })
 
     const checkinMessage = computed(() => {
       if (checkedToday.value) {
@@ -171,15 +150,15 @@ export default {
     })
 
     // 生成日历数据
-    const generateCalendar = () => {
+    const generateCalendar = (checkedDays = []) => {
       const today = new Date()
       const year = today.getFullYear()
       const month = today.getMonth()
       const firstDay = new Date(year, month, 1).getDay()
       const daysInMonth = new Date(year, month + 1, 0).getDate()
-      
+
       calendarDays.length = 0
-      
+
       // 上个月的日期
       const prevMonthDays = new Date(year, month, 0).getDate()
       for (let i = firstDay - 1; i >= 0; i--) {
@@ -191,9 +170,8 @@ export default {
           isToday: false
         })
       }
-      
+
       // 本月的日期
-      const checkedDays = [10, 11, 12, 13, 14, 15, 16] // 模拟已签到的日期
       for (let i = 1; i <= daysInMonth; i++) {
         calendarDays.push({
           day: i,
@@ -203,7 +181,7 @@ export default {
           isToday: i === today.getDate()
         })
       }
-      
+
       // 下个月的日期（填充到42格）
       const remainingDays = 42 - calendarDays.length
       for (let i = 1; i <= remainingDays; i++) {
@@ -217,28 +195,75 @@ export default {
       }
     }
 
-    generateCalendar()
+    const loadMonthSignData = async () => {
+      try {
+        const res = await signMonth()
+        const monthFlags = Array.isArray(res.data) ? res.data : []
 
-    const handleCheckIn = () => {
-      loading.value = true
-      
-      setTimeout(() => {
-        checkedToday.value = true
-        checkinData.continuousDays++
-        checkinData.totalDays++
-        checkinData.totalPoints += 5
-        
-        // 更新今天的签到状态
+        // 后端返回格式：数组下标对应“日期-1”，值为1表示已签到
+        const checkedDays = monthFlags
+          .map((flag, index) => (Number(flag) === 1 ? index + 1 : null))
+          .filter(day => day !== null)
+
+        generateCalendar(checkedDays)
+        checkinData.totalDays = checkedDays.length
+
+        // 前端根据本月签到记录计算连续签到（从今天往前）
         const today = new Date().getDate()
-        const todayItem = calendarDays.find(day => day.day === today && day.currentMonth)
-        if (todayItem) {
-          todayItem.checked = true
+        let continuous = 0
+        for (let d = today; d >= 1; d--) {
+          if (Number(monthFlags[d - 1]) === 1) {
+            continuous++
+          } else {
+            break
+          }
         }
-        
-        loading.value = false
-        ElMessage.success('签到成功！获得5积分')
-      }, 1000)
+        checkinData.continuousDays = continuous
+        checkinData.totalPoints = checkedDays.length * 5
+
+        checkedToday.value = Number(monthFlags[today - 1]) === 1
+      } catch (error) {
+        console.error('获取签到记录失败：', error)
+        generateCalendar([])
+      }
     }
+
+    const handleCheckIn = async () => {
+      loading.value = true
+      try {
+        const res = await signToday()
+        if (res.code === 200) {
+          // 签到后调用积分增加接口
+          await addPoints({
+            sourceType: 6,
+            remark: '每日签到',
+            points: 5
+          })
+
+          checkedToday.value = true
+          checkinData.continuousDays += 1
+          checkinData.totalDays += 1
+          checkinData.totalPoints += 5
+
+          // 更新今天的签到状态
+          const today = new Date().getDate()
+          const todayItem = calendarDays.find(day => day.day === today && day.currentMonth)
+          if (todayItem) {
+            todayItem.checked = true
+          }
+
+          ElMessage.success('签到成功！已增加积分')
+        }
+      } catch (error) {
+        console.error('签到失败：', error)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    onMounted(() => {
+      loadMonthSignData()
+    })
 
     return {
       checkedToday,
@@ -248,7 +273,6 @@ export default {
       weekDays,
       calendarDays,
       rewards,
-      topCheckinUsers,
       handleCheckIn
     }
   }

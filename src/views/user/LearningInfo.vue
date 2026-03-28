@@ -10,7 +10,7 @@
               <component :is="item.icon" />
             </el-icon>
             <div class="stat-text">
-              <div class="stat-value">{{ item.value }}</div>
+              <div class="stat-value">{{ item.value }}{{ item.unit }}</div>
               <div class="stat-label">{{ item.title }}</div>
             </div>
           </div>
@@ -27,12 +27,7 @@
               <el-tag :type="row.type === '文章' ? 'success' : 'warning'">{{ row.type }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="duration" label="学习时长" width="120" />
-          <el-table-column prop="progress" label="学习进度" width="150">
-            <template #default="{ row }">
-              <el-progress :percentage="row.progress" :color="progressColor" />
-            </template>
-          </el-table-column>
+          <el-table-column prop="points" label="获得积分" width="120" />
           <el-table-column prop="date" label="学习日期" width="180" />
           <el-table-column label="操作" width="150">
             <template #default="{ row }">
@@ -40,6 +35,14 @@
             </template>
           </el-table-column>
         </el-table>
+        <el-pagination
+          class="table-pagination"
+          :current-page="learningPage"
+          :page-size="learningPageSize"
+          :total="learningTotal"
+          layout="total, prev, pager, next"
+          @current-change="handleLearningPageChange"
+        />
       </el-tab-pane>
 
       <el-tab-pane label="积分明细" name="points">
@@ -61,43 +64,23 @@
             </el-card>
           </el-timeline-item>
         </el-timeline>
-      </el-tab-pane>
-
-      <el-tab-pane label="学习统计" name="statistics">
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-card>
-              <template #header>
-                <div class="card-header">
-                  <span>每周学习时长</span>
-                </div>
-              </template>
-              <div class="chart-container">
-                <div class="chart-placeholder">图表区域（可接入ECharts）</div>
-              </div>
-            </el-card>
-          </el-col>
-          <el-col :span="12">
-            <el-card>
-              <template #header>
-                <div class="card-header">
-                  <span>学习类型分布</span>
-                </div>
-              </template>
-              <div class="chart-container">
-                <div class="chart-placeholder">图表区域（可接入ECharts）</div>
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
+        <el-pagination
+          class="table-pagination"
+          :current-page="pointsPage"
+          :page-size="pointsPageSize"
+          :total="pointsTotal"
+          layout="total, prev, pager, next"
+          @current-change="handlePointsPageChange"
+        />
       </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <script>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getPointsHistory, getLearningHistory, getUserStatistics } from '@/api/user'
 
 export default {
   name: 'LearningInfo',
@@ -106,69 +89,21 @@ export default {
     const activeTab = ref('history')
 
     const statsCards = reactive([
-      { title: '学习天数', value: '128天', icon: 'Calendar', color: '#409EFF' },
-      { title: '学习时长', value: '256小时', icon: 'Timer', color: '#67C23A' },
-      { title: '完成课程', value: '45个', icon: 'Document', color: '#E6A23C' },
-      { title: '获得积分', value: '1250分', icon: 'TrophyBase', color: '#F56C6C' }
+      { title: '学习文章', value: 0, unit: '篇', icon: 'Reading', color: '#67C23A' },
+      { title: '学习视频', value: 0, unit: '个', icon: 'VideoCamera', color: '#E6A23C' },
+      { title: '发表帖子', value: 0, unit: '条', icon: 'ChatDotRound', color: '#409EFF' },
+      { title: '获得积分', value: 0, unit: '分', icon: 'TrophyBase', color: '#F56C6C' }
     ])
 
-    const learningHistory = reactive([
-      {
-        id: 1,
-        title: '新中国成立的伟大历程',
-        type: '文章',
-        duration: '25分钟',
-        progress: 100,
-        date: '2025-10-17 14:30'
-      },
-      {
-        id: 2,
-        title: '改革开放四十年',
-        type: '视频',
-        duration: '42分钟',
-        progress: 75,
-        date: '2025-10-16 10:20'
-      },
-      {
-        id: 3,
-        title: '科技强国之路',
-        type: '文章',
-        duration: '18分钟',
-        progress: 100,
-        date: '2025-10-15 16:45'
-      }
-    ])
+    const learningHistory = ref([])
+    const learningPage = ref(1)
+    const learningPageSize = ref(10)
+    const learningTotal = ref(0)
 
-    const pointsHistory = reactive([
-      {
-        id: 1,
-        title: '完成文章学习',
-        points: 20,
-        description: '学习《新中国成立的伟大历程》',
-        date: '2025-10-17 14:30'
-      },
-      {
-        id: 2,
-        title: '每日签到',
-        points: 5,
-        description: '连续签到第7天',
-        date: '2025-10-17 08:00'
-      },
-      {
-        id: 3,
-        title: '视频学习',
-        points: 15,
-        description: '观看《改革开放四十年》',
-        date: '2025-10-16 10:20'
-      },
-      {
-        id: 4,
-        title: '发表评论',
-        points: 10,
-        description: '在论坛发表优质评论',
-        date: '2025-10-15 20:15'
-      }
-    ])
+    const pointsHistory = ref([])
+    const pointsPage = ref(1)
+    const pointsPageSize = ref(10)
+    const pointsTotal = ref(0)
 
     const progressColor = (percentage) => {
       if (percentage < 30) return '#F56C6C'
@@ -176,21 +111,109 @@ export default {
       return '#67C23A'
     }
 
-    const continueLearn = (row) => {
-      if (row.type === '文章') {
-        router.push(`/article-detail/${row.id}`)
-      } else {
-        router.push(`/video-detail/${row.id}`)
+
+    const loadLearningHistory = async () => {
+      try {
+        const res = await getLearningHistory({
+          page: learningPage.value,
+          pageSize: learningPageSize.value
+        })
+        if (res.code === 200 && res.data) {
+          const pageData = res.data
+          const list = pageData.list || pageData.records || []
+          learningTotal.value = Number(pageData.total || list.length || 0)
+          learningHistory.value = list.map(item => ({
+            id: item.id,
+            title: item.remark || '学习记录',
+            type: Number(item.sourceType) === 1 ? '文章' : '视频',
+            points: Number(item.points || 0),
+            date: item.createTime || '',
+            sourceId: item.sourceId
+          }))
+        }
+      } catch (error) {
+        console.error('获取学习历史失败：', error)
       }
     }
+
+    const loadUserStatistics = async () => {
+      try {
+        const res = await getUserStatistics()
+        if (res.code === 200 && res.data) {
+          statsCards[0].value = Number(res.data.articleCount || 0)
+          statsCards[1].value = Number(res.data.videoCount || 0)
+          statsCards[2].value = Number(res.data.topicCount || 0)
+          statsCards[3].value = Number(res.data.points || 0)
+        }
+      } catch (error) {
+        console.error('获取学习统计失败：', error)
+      }
+    }
+
+    const loadPointsHistory = async () => {
+      try {
+        const res = await getPointsHistory({
+          page: pointsPage.value,
+          pageSize: pointsPageSize.value
+        })
+        if (res.code === 200 && res.data) {
+          const pageData = res.data
+          const list = pageData.list || pageData.records || []
+          pointsTotal.value = Number(pageData.total || list.length || 0)
+          pointsHistory.value = list.map(item => ({
+            id: item.id,
+            title: item.sourceTypeName || item.remark || '积分变动',
+            points: Number(item.changePoints || 0),
+            description: item.remark || `来源类型：${item.sourceTypeName || item.sourceType || '--'}`,
+            date: item.createTime || ''
+          }))
+        }
+      } catch (error) {
+        console.error('获取积分明细失败：', error)
+      }
+    }
+
+    const handleLearningPageChange = (page) => {
+      learningPage.value = page
+      loadLearningHistory()
+    }
+
+    const handlePointsPageChange = (page) => {
+      pointsPage.value = page
+      loadPointsHistory()
+    }
+
+    const continueLearn = (row) => {
+      const targetId = row.sourceId || row.id
+      if (!targetId) return
+      if (row.type === '文章') {
+        router.push(`/article-detail/${targetId}`)
+      } else {
+        router.push(`/video-detail/${targetId}`)
+      }
+    }
+
+    onMounted(() => {
+      loadUserStatistics()
+      loadLearningHistory()
+      loadPointsHistory()
+    })
 
     return {
       activeTab,
       statsCards,
       learningHistory,
       pointsHistory,
+      learningPage,
+      learningPageSize,
+      learningTotal,
+      pointsPage,
+      pointsPageSize,
+      pointsTotal,
       progressColor,
-      continueLearn
+      continueLearn,
+      handleLearningPageChange,
+      handlePointsPageChange
     }
   }
 }
@@ -245,16 +268,10 @@ export default {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
-.chart-container {
-  height: 300px;
+.table-pagination {
+  margin-top: 16px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.chart-placeholder {
-  color: #999;
-  font-size: 16px;
+  justify-content: flex-end;
 }
 
 @media (max-width: 768px) {

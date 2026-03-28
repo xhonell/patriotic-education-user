@@ -17,7 +17,7 @@
           </div>
           <div class="topic-stats">
             <span><el-icon><View /></el-icon> {{ topic.views }}</span>
-            <span><el-icon><Star /></el-icon> {{ topic.likes }}</span>
+            <span><el-icon><ChatDotRound /></el-icon> {{ replies.length }}</span>
           </div>
         </div>
       </div>
@@ -25,21 +25,6 @@
       <!-- 话题内容 -->
       <div class="topic-content" v-html="topic.content"></div>
 
-      <!-- 话题操作 -->
-      <div class="topic-actions">
-        <el-button type="primary" @click="handleLike" :disabled="hasLiked">
-          <el-icon><StarFilled /></el-icon>
-          {{ hasLiked ? '已点赞' : '点赞' }} ({{ topic.likes }})
-        </el-button>
-        <el-button @click="handleCollect" :disabled="hasCollected">
-          <el-icon><Collection /></el-icon>
-          {{ hasCollected ? '已收藏' : '收藏' }}
-        </el-button>
-        <el-button @click="handleShare">
-          <el-icon><Share /></el-icon>
-          分享
-        </el-button>
-      </div>
     </el-card>
 
     <!-- 回复区 -->
@@ -78,10 +63,6 @@
                 <el-icon><ChatDotRound /></el-icon>
                 回复
               </el-button>
-              <el-button type="text" size="small" @click="likeReply(reply)">
-                <el-icon><Star /></el-icon>
-                {{ reply.likes }}
-              </el-button>
             </div>
 
             <!-- 子回复 -->
@@ -109,172 +90,188 @@
 </template>
 
 <script>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getTopicDetail, getTopicCommentPage, publishTopicComment } from '@/api/community'
+import { addPoints } from '@/api/points'
 
 export default {
   name: 'TopicDetail',
   setup() {
     const route = useRoute()
-    const hasLiked = ref(false)
-    const hasCollected = ref(false)
     const newReply = ref('')
 
     const topic = reactive({
-      id: 1,
-      category: 'share',
-      title: '学习《改革开放四十年》纪录片的心得体会',
+      id: null,
+      category: 1,
+      title: '',
       author: {
-        name: '爱国青年',
+        name: '匿名用户',
         avatar: 'https://via.placeholder.com/100'
       },
-      time: '2025-10-17 14:30',
-      views: 580,
-      likes: 89,
-      content: `
-        <p>今天看完了《改革开放四十年》这部纪录片，内心久久不能平静，深深感受到改革开放给中国带来的翻天覆地的变化。</p>
-        
-        <h3>一、改革开放的伟大意义</h3>
-        <p>1978年，党的十一届三中全会召开，开启了改革开放的伟大征程。四十年来，中国从一个贫穷落后的农业国发展成为世界第二大经济体，这是人类历史上最伟大的经济奇迹。</p>
-        
-        <h3>二、人民生活的巨大变化</h3>
-        <p>改革开放让人民的生活发生了翻天覆地的变化。从吃不饱穿不暖，到现在的小康生活；从自行车王国，到高铁网络遍布全国；从通信不便，到现在的移动互联网时代。这些变化都离不开改革开放的伟大决策。</p>
-        
-        <h3>三、对当代青年的启示</h3>
-        <p>作为新时代的青年，我们要继承和发扬改革开放精神，勇于创新、敢于拼搏，为实现中华民族伟大复兴的中国梦而努力奋斗！</p>
-        
-        <p>这是我的一点浅见，欢迎大家一起讨论交流！</p>
-      `
+      time: '',
+      views: 0,
+      likes: 0,
+      content: ''
     })
 
-    const replies = reactive([
-      {
-        id: 1,
-        user: {
-          name: '学习之星',
-          avatar: 'https://via.placeholder.com/100'
-        },
-        content: '说得太好了！改革开放确实改变了中国，改变了我们的生活。作为青年一代，我们更应该珍惜现在的幸福生活，努力学习，报效祖国！',
-        time: '2小时前',
-        likes: 12,
-        subReplies: [
-          {
-            id: 11,
-            user: {
-              name: '爱国青年',
-              avatar: 'https://via.placeholder.com/100'
-            },
-            replyTo: '学习之星',
-            content: '是的，我们要倍加珍惜！',
-            time: '1小时前'
-          }
-        ]
-      },
-      {
-        id: 2,
-        user: {
-          name: '历史爱好者',
-          avatar: 'https://via.placeholder.com/100'
-        },
-        content: '这部纪录片我也看了，非常震撼！特别是看到那些老照片和历史影像，真的能感受到时代的变迁。推荐大家都去看看！',
-        time: '3小时前',
-        likes: 8,
-        subReplies: []
-      },
-      {
-        id: 3,
-        user: {
-          name: '奋斗者',
-          avatar: 'https://via.placeholder.com/100'
-        },
-        content: '改革开放是当代中国最显著的特征、最壮丽的气象。我们要坚定不移地推进改革开放，让中国更加繁荣富强！',
-        time: '5小时前',
-        likes: 15,
-        subReplies: []
-      }
-    ])
+    const replies = ref([])
 
     const getCategoryType = (category) => {
       const typeMap = {
-        'discuss': 'primary',
-        'share': 'success',
-        'question': 'warning',
-        'activity': 'danger'
+        1: 'primary',
+        2: 'warning',
+        3: 'success',
+        4: 'danger'
       }
-      return typeMap[category] || ''
+      return typeMap[Number(category)] || ''
     }
 
     const getCategoryText = (category) => {
       const textMap = {
-        'discuss': '讨论',
-        'share': '分享',
-        'question': '问答',
-        'activity': '活动'
+        1: '讨论',
+        2: '问答',
+        3: '分享',
+        4: '活动'
       }
-      return textMap[category] || ''
+      return textMap[Number(category)] || '未分类'
     }
 
-    const handleLike = () => {
-      hasLiked.value = true
-      topic.likes++
-      ElMessage.success('点赞成功！+2积分')
-    }
-
-    const handleCollect = () => {
-      hasCollected.value = true
-      ElMessage.success('收藏成功！')
-    }
-
-    const handleShare = () => {
-      ElMessage.success('分享链接已复制到剪贴板')
-    }
-
-    const handleReply = () => {
+    const handleReply = async () => {
       if (!newReply.value.trim()) {
         ElMessage.warning('请输入回复内容')
         return
       }
 
-      replies.unshift({
-        id: Date.now(),
-        user: {
-          name: '当前用户',
-          avatar: 'https://via.placeholder.com/100'
-        },
-        content: newReply.value,
-        time: '刚刚',
-        likes: 0,
-        subReplies: []
-      })
-
-      newReply.value = ''
-      ElMessage.success('回复成功！+10积分')
+      try {
+        const res = await publishTopicComment({
+          topicId: Number(route.params.id),
+          parentId: null,
+          content: newReply.value
+        })
+        if (res.code === 200) {
+          await addPoints({
+            sourceType: 3,
+            sourceId: String(route.params.id),
+            remark: '发表评论',
+            points: 10
+          })
+          newReply.value = ''
+          ElMessage.success('回复成功')
+          await loadTopicComments()
+        }
+      } catch (error) {
+        console.error('发布评论失败：', error)
+      }
     }
 
-    const showReplyDialog = (reply) => {
-      ElMessage.info('回复功能开发中...')
+    const showReplyDialog = async (reply) => {
+      try {
+        const { value } = await ElMessageBox.prompt('请输入回复内容', `回复 ${reply.user.name}`, {
+          confirmButtonText: '发布',
+          cancelButtonText: '取消',
+          inputType: 'textarea',
+          inputPlaceholder: '写下你的回复...'
+        })
+
+        if (!value || !value.trim()) {
+          ElMessage.warning('请输入回复内容')
+          return
+        }
+
+        const res = await publishTopicComment({
+          topicId: Number(route.params.id),
+          parentId: reply.id,
+          content: value.trim()
+        })
+
+        if (res.code === 200) {
+          await addPoints({
+            sourceType: 3,
+            sourceId: String(route.params.id),
+            remark: '发表评论',
+            points: 10
+          })
+          ElMessage.success('回复成功')
+          await loadTopicComments()
+        }
+      } catch (error) {
+        if (error !== 'cancel') {
+          console.error('回复评论失败：', error)
+        }
+      }
     }
 
-    const likeReply = (reply) => {
-      reply.likes++
-      ElMessage.success('点赞成功！')
+    const loadTopicDetail = async () => {
+      try {
+        const res = await getTopicDetail(Number(route.params.id))
+        if (res.code === 200 && res.data) {
+          const data = res.data
+          topic.id = data.id
+          topic.category = Number(data.category || data.categoryCode) || 1
+          topic.title = data.title || ''
+          topic.author.name = data.userName || data.authorName || data.author || '匿名用户'
+          topic.author.avatar = data.avatarUrl || data.authorAvatar || 'https://via.placeholder.com/100'
+          topic.time = data.createTime || ''
+          topic.views = data.viewCount || 0
+          topic.likes = 0
+          topic.content = data.content || ''
+        }
+      } catch (error) {
+        console.error('获取话题详情失败：', error)
+      }
     }
+
+    const loadTopicComments = async () => {
+      try {
+        const res = await getTopicCommentPage({
+          topicId: Number(route.params.id),
+          page: 1,
+          pageSize: 50,
+          orderBy: 'create_time',
+          orderType: 'DESC'
+        })
+        if (res.code === 200 && res.data) {
+          replies.value = (res.data.list || []).map(item => ({
+            id: item.id,
+            user: {
+              name: item.userName || item.authorName || '匿名用户',
+              avatar: item.userAvatar || 'https://via.placeholder.com/100'
+            },
+            content: item.content || '',
+            time: item.createTime || '',
+            likes: item.likeCount || 0,
+            subReplies: (item.children || []).map(child => ({
+              id: child.id,
+              user: {
+                name: child.userName || child.authorName || '匿名用户',
+                avatar: child.userAvatar || 'https://via.placeholder.com/100'
+              },
+              replyTo: child.replyToUserName || '楼主',
+              content: child.content || '',
+              time: child.createTime || ''
+            }))
+          }))
+        }
+      } catch (error) {
+        console.error('获取话题评论失败：', error)
+      }
+    }
+
+    onMounted(() => {
+      loadTopicDetail()
+      loadTopicComments()
+    })
 
     return {
       topic,
       replies,
-      hasLiked,
-      hasCollected,
       newReply,
       getCategoryType,
       getCategoryText,
-      handleLike,
-      handleCollect,
-      handleShare,
       handleReply,
-      showReplyDialog,
-      likeReply
+      showReplyDialog
     }
   }
 }

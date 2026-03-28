@@ -7,7 +7,9 @@
       <el-col :xs="24" :sm="12" :md="6">
         <el-card class="point-card gradient-bg-red">
           <div class="point-info">
-            <el-icon :size="50"><TrophyBase /></el-icon>
+            <el-icon :size="50">
+              <TrophyBase />
+            </el-icon>
             <div class="point-text">
               <div class="point-value">{{ userPoints.total }}</div>
               <div class="point-label">总积分</div>
@@ -18,18 +20,25 @@
       <el-col :xs="24" :sm="12" :md="6">
         <el-card class="point-card gradient-bg-blue">
           <div class="point-info">
-            <el-icon :size="50"><Medal /></el-icon>
+            <el-icon :size="50">
+              <Medal />
+            </el-icon>
             <div class="point-text">
               <div class="point-value">Lv.{{ userPoints.level }}</div>
-              <div class="point-label">当前等级</div>
+              <div class="point-label">{{ currentLevelName }}</div>
             </div>
           </div>
         </el-card>
       </el-col>
       <el-col :xs="24" :sm="12" :md="6">
-        <el-card class="point-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%)">
+        <el-card
+          class="point-card"
+          style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+        >
           <div class="point-info">
-            <el-icon :size="50"><Star /></el-icon>
+            <el-icon :size="50">
+              <Star />
+            </el-icon>
             <div class="point-text">
               <div class="point-value">{{ userPoints.weekPoints }}</div>
               <div class="point-label">本周获得</div>
@@ -38,9 +47,14 @@
         </el-card>
       </el-col>
       <el-col :xs="24" :sm="12" :md="6">
-        <el-card class="point-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)">
+        <el-card
+          class="point-card"
+          style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
+        >
           <div class="point-info">
-            <el-icon :size="50"><Rank /></el-icon>
+            <el-icon :size="50">
+              <Rank />
+            </el-icon>
             <div class="point-text">
               <div class="point-value">{{ userPoints.rank }}</div>
               <div class="point-label">排名</div>
@@ -51,44 +65,35 @@
     </el-row>
 
     <el-row :gutter="20">
-      <!-- 积分任务 -->
+      <!-- 每日积分来源 -->
       <el-col :xs="24" :lg="14">
         <el-card class="task-card">
           <template #header>
             <div class="card-header">
-              <span>每日任务</span>
-              <el-tag type="success">今日已完成 {{ completedTasks }}/{{ dailyTasks.length }}</el-tag>
+              <span>每日积分来源</span>
+              <el-tag type="success">今日累计 {{ sourceTotalPoints }} 积分</el-tag>
             </div>
           </template>
           <div class="task-list">
-            <div class="task-item" v-for="task in dailyTasks" :key="task.id">
+            <div class="task-item" v-for="source in dailySources" :key="source.key">
               <div class="task-icon">
-                <el-icon :size="32" :color="task.completed ? '#67C23A' : '#409EFF'">
-                  <component :is="task.icon" />
+                <el-icon :size="32" :color="source.color">
+                  <component :is="source.icon" />
                 </el-icon>
               </div>
               <div class="task-content">
-                <div class="task-title">{{ task.title }}</div>
-                <div class="task-desc">{{ task.description }}</div>
+                <div class="task-title">{{ source.title }}</div>
+                <div class="task-desc">{{ source.description }}</div>
                 <div class="task-progress">
-                  <el-progress :percentage="task.progress" :status="task.completed ? 'success' : ''" />
-                  <span class="progress-text">{{ task.current }}/{{ task.target }}</span>
+                  <el-progress
+                    :percentage="source.percentage"
+                    :status="source.percentage > 0 ? 'success' : ''"
+                  />
+                  <span class="progress-text">{{ source.points }} 积分</span>
                 </div>
               </div>
               <div class="task-reward">
-                <div class="reward-points">+{{ task.points }}</div>
-                <el-button
-                  v-if="task.completed && !task.claimed"
-                  type="success"
-                  size="small"
-                  @click="claimReward(task)"
-                >
-                  领取
-                </el-button>
-                <el-tag v-else-if="task.claimed" type="info" size="small">已领取</el-tag>
-                <el-button v-else type="primary" size="small" @click="goToTask(task)">
-                  去完成
-                </el-button>
+                <div class="reward-points">+{{ source.points }}</div>
               </div>
             </div>
           </div>
@@ -128,16 +133,16 @@
           </template>
           <div class="level-content">
             <div class="current-level">
-              <el-icon :size="60" color="#409EFF"><Medal /></el-icon>
+              <el-icon :size="60" color="#409EFF">
+                <Medal />
+              </el-icon>
               <h2>Lv.{{ userPoints.level }}</h2>
             </div>
-            <el-progress
-              :percentage="levelProgress"
-              :stroke-width="20"
-              :text-inside="true"
-            />
+            <el-progress :percentage="levelProgress" :stroke-width="20" :text-inside="true" />
             <p class="level-tip">
-              还需 <span class="highlight">{{ pointsToNextLevel }}</span> 积分升级到 Lv.{{ userPoints.level + 1 }}
+              还需
+              <span class="highlight">{{ pointsToNextLevel }}</span>
+              积分升级到 Lv.{{ userPoints.level + 1 }}
             </p>
           </div>
         </el-card>
@@ -151,19 +156,20 @@
             </div>
           </template>
           <div class="ranking-list">
-            <div class="ranking-item" v-for="(user, index) in topUsers" :key="user.id">
-              <div class="rank-number" :class="'rank-' + (index + 1)">
-                {{ index + 1 }}
-              </div>
+            <div class="ranking-item" v-for="(user, index) in topUsers" :key="user.userId || index">
+              <div class="rank-number" :class="'rank-' + (user.ranking || index + 1)">{{ user.ranking || index + 1 }}</div>
               <el-avatar :src="user.avatar" :size="36">
-                <el-icon><User /></el-icon>
+                <el-icon>
+                  <User />
+                </el-icon>
               </el-avatar>
               <div class="user-info">
-                <div class="user-name">{{ user.username }}</div>
+                <div class="user-name">{{ user.userName }}</div>
                 <div class="user-points">{{ user.points }} 积分</div>
               </div>
             </div>
           </div>
+
         </el-card>
       </el-col>
     </el-row>
@@ -171,9 +177,9 @@
 </template>
 
 <script>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { getPointsStatistics, getPointsBySource, getPointsRanking } from '@/api/points'
 
 export default {
   name: 'Integration',
@@ -181,137 +187,211 @@ export default {
     const router = useRouter()
 
     const userPoints = reactive({
-      total: 1250,
-      level: 5,
-      weekPoints: 180,
-      rank: 128
+      total: 0,
+      level: 1,
+      weekPoints: 0,
+      rank: '--'
     })
 
-    const dailyTasks = reactive([
-      {
-        id: 1,
-        title: '每日签到',
-        description: '连续签到可获得额外奖励',
-        icon: 'Calendar',
-        points: 5,
-        current: 1,
-        target: 1,
-        progress: 100,
-        completed: true,
-        claimed: false
-      },
-      {
-        id: 2,
-        title: '学习文章',
-        description: '完成3篇文章学习',
-        icon: 'Reading',
-        points: 30,
-        current: 2,
-        target: 3,
-        progress: 67,
-        completed: false,
-        claimed: false
-      },
-      {
-        id: 3,
-        title: '观看视频',
-        description: '完成2个视频观看',
-        icon: 'VideoCamera',
-        points: 40,
-        current: 1,
-        target: 2,
-        progress: 50,
-        completed: false,
-        claimed: false
-      },
-      {
-        id: 4,
-        title: '社区互动',
-        description: '发表5条评论',
-        icon: 'ChatDotRound',
-        points: 20,
-        current: 3,
-        target: 5,
-        progress: 60,
-        completed: false,
-        claimed: false
-      }
-    ])
+    const dailySources = ref([])
+    const sourceTotalPoints = ref(0)
 
     const pointRules = reactive([
-      { action: '每日签到', points: 5, limit: '每天1次' },
-      { action: '完成文章学习', points: 20, limit: '不限次数' },
-      { action: '完成视频学习', points: 30, limit: '不限次数' },
-      { action: '发表评论', points: 10, limit: '每天10次' },
-      { action: '发表帖子', points: 15, limit: '每天5次' },
-      { action: '评论被点赞', points: 2, limit: '不限次数' },
-      { action: '连续签到7天', points: 50, limit: '每周1次' }
+      { action: '其他来源（含签到）', points: 0, limit: '不限制' },
+      { action: '文章学习', points: 0, limit: '不限制' },
+      { action: '视频学习', points: 0, limit: '不限制' },
+      { action: '发表评论', points: 0, limit: '每日最多5积分' },
+      { action: '点赞内容', points: 0, limit: '每日最多5积分' },
+      { action: '收藏内容', points: 0, limit: '每日最多5积分' }
     ])
 
-    const topUsers = reactive([
-      { id: 1, username: '学习之星', avatar: 'https://via.placeholder.com/100', points: 5280 },
-      { id: 2, username: '爱国青年', avatar: 'https://via.placeholder.com/100', points: 4650 },
-      { id: 3, username: '奋斗者', avatar: 'https://via.placeholder.com/100', points: 3920 },
-      { id: 4, username: '追梦人', avatar: 'https://via.placeholder.com/100', points: 3540 },
-      { id: 5, username: '知识达人', avatar: 'https://via.placeholder.com/100', points: 3280 }
-    ])
+    const topUsers = ref([])
 
-    const completedTasks = computed(() => {
-      return dailyTasks.filter(task => task.completed).length
-    })
+    const levelConfigs = [
+      { level: 1, name: '新手', points: 0 },
+      { level: 2, name: '入门', points: 100 },
+      { level: 3, name: '进阶', points: 300 },
+      { level: 4, name: '熟练', points: 600 },
+      { level: 5, name: '精通', points: 1000 },
+      { level: 6, name: '专家', points: 1500 },
+      { level: 7, name: '大师', points: 2000 },
+      { level: 8, name: '宗师', points: 3000 },
+      { level: 9, name: '传说', points: 4000 },
+      { level: 10, name: '神话', points: 5000 }
+    ]
+
+    const levelThresholds = levelConfigs.map(item => item.points)
+
+    const calcLevelByPoints = (points = 0) => {
+      const value = Number(points || 0)
+      let level = 1
+      for (let i = 0; i < levelThresholds.length; i++) {
+        if (value >= levelThresholds[i]) {
+          level = i + 1
+        }
+      }
+      return level
+    }
+
+    const getLevelName = (level) => {
+      return levelConfigs.find(item => item.level === level)?.name || '新手'
+    }
+
+    const currentLevelName = computed(() => getLevelName(userPoints.level))
 
     const levelProgress = computed(() => {
-      const basePoints = (userPoints.level - 1) * 500
-      const currentLevelPoints = userPoints.total - basePoints
-      const nextLevelRequire = 500
-      return Math.floor((currentLevelPoints / nextLevelRequire) * 100)
+      const currentLevel = calcLevelByPoints(userPoints.total)
+      const currentStart = levelThresholds[currentLevel - 1] ?? 0
+      const nextStart = levelThresholds[currentLevel] ?? (currentStart + 1000)
+      const span = Math.max(1, nextStart - currentStart)
+      const progressed = Math.max(0, userPoints.total - currentStart)
+      return Math.min(100, Math.floor((progressed / span) * 100))
     })
 
     const pointsToNextLevel = computed(() => {
-      const basePoints = (userPoints.level - 1) * 500
-      const currentLevelPoints = userPoints.total - basePoints
-      const nextLevelRequire = 500
-      return nextLevelRequire - currentLevelPoints
+      const currentLevel = calcLevelByPoints(userPoints.total)
+      const nextStart = levelThresholds[currentLevel]
+      if (nextStart == null) return 0
+      return Math.max(0, nextStart - userPoints.total)
     })
-
-    const claimReward = (task) => {
-      task.claimed = true
-      userPoints.total += task.points
-      userPoints.weekPoints += task.points
-      ElMessage.success(`领取成功！获得 ${task.points} 积分`)
-    }
-
-    const goToTask = (task) => {
-      switch (task.id) {
-        case 1:
-          router.push('/check-in')
-          break
-        case 2:
-          router.push('/article-learning')
-          break
-        case 3:
-          router.push('/video-learning')
-          break
-        case 4:
-          router.push('/community')
-          break
-      }
-    }
 
     const goToRanking = () => {
       router.push('/ranking')
     }
 
+    const loadPointsStatistics = async () => {
+      try {
+        const res = await getPointsStatistics()
+        if (res.code === 200 && res.data) {
+          userPoints.total = Number(res.data.totalPoints || 0)
+          userPoints.weekPoints = Number(res.data.thisWeekPoints || 0)
+          userPoints.rank = res.data.ranking ?? '--'
+          userPoints.level = calcLevelByPoints(userPoints.total)
+        }
+      } catch (error) {
+        console.error('获取积分统计失败：', error)
+      }
+    }
+
+    const loadPointsRanking = async () => {
+      try {
+        const res = await getPointsRanking()
+        if (res.code === 200 && res.data) {
+          const list = Array.isArray(res.data) ? res.data : (res.data.list || res.data.records || [])
+          topUsers.value = list.slice(0, 5).map(item => ({
+            ranking: item.ranking,
+            userId: item.userId,
+            userName: item.userName || '匿名用户',
+            avatar: item.avatarUrl || 'https://via.placeholder.com/100',
+            points: Number(item.points || 0)
+          }))
+        }
+      } catch (error) {
+        console.error('获取积分排行榜失败：', error)
+      }
+    }
+
+    const loadPointsBySource = async () => {
+      try {
+        const res = await getPointsBySource()
+        if (res.code === 200 && res.data) {
+          const bySource = res.data
+          const articlePoints = Number(bySource.articlePoints || 0)
+          const videoPoints = Number(bySource.videoPoints || 0)
+          const commentPoints = Number(bySource.commentPoints || 0)
+          const likePoints = Number(bySource.likePoints || 0)
+          const collectPoints = Number(bySource.collectPoints || 0)
+          const otherPoints = Number(bySource.otherPoints || 0)
+          const totalPoints = Number(
+            bySource.totalPoints ||
+              (articlePoints + videoPoints + commentPoints + likePoints + collectPoints + otherPoints)
+          )
+
+          sourceTotalPoints.value = totalPoints
+          dailySources.value = [
+            {
+              key: 'article',
+              title: '文章学习',
+              description: '完成文章学习获得积分',
+              icon: 'Reading',
+              color: '#409EFF',
+              points: articlePoints,
+              percentage: totalPoints > 0 ? Math.round((articlePoints / totalPoints) * 100) : 0
+            },
+            {
+              key: 'video',
+              title: '视频学习',
+              description: '完成视频学习获得积分',
+              icon: 'VideoCamera',
+              color: '#67C23A',
+              points: videoPoints,
+              percentage: totalPoints > 0 ? Math.round((videoPoints / totalPoints) * 100) : 0
+            },
+            {
+              key: 'comment',
+              title: '发表评论',
+              description: '参与评论互动获得积分',
+              icon: 'ChatDotRound',
+              color: '#E6A23C',
+              points: commentPoints,
+              percentage: totalPoints > 0 ? Math.round((commentPoints / totalPoints) * 100) : 0
+            },
+            {
+              key: 'like',
+              title: '点赞内容',
+              description: '点赞优质内容获得积分',
+              icon: 'Star',
+              color: '#F56C6C',
+              points: likePoints,
+              percentage: totalPoints > 0 ? Math.round((likePoints / totalPoints) * 100) : 0
+            },
+            {
+              key: 'collect',
+              title: '收藏内容',
+              description: '收藏学习内容获得积分',
+              icon: 'Collection',
+              color: '#909399',
+              points: collectPoints,
+              percentage: totalPoints > 0 ? Math.round((collectPoints / totalPoints) * 100) : 0
+            },
+            {
+              key: 'other',
+              title: '其他来源',
+              description: '签到等其他行为获得积分',
+              icon: 'Calendar',
+              color: '#8E44AD',
+              points: otherPoints,
+              percentage: totalPoints > 0 ? Math.round((otherPoints / totalPoints) * 100) : 0
+            }
+          ]
+
+          pointRules[0].points = otherPoints
+          pointRules[1].points = articlePoints
+          pointRules[2].points = videoPoints
+          pointRules[3].points = commentPoints
+          pointRules[4].points = likePoints
+          pointRules[5].points = collectPoints
+        }
+      } catch (error) {
+        console.error('获取积分来源统计失败：', error)
+      }
+    }
+
+    onMounted(() => {
+      loadPointsStatistics()
+      loadPointsBySource()
+      loadPointsRanking()
+    })
+
     return {
       userPoints,
-      dailyTasks,
+      dailySources,
+      sourceTotalPoints,
       pointRules,
       topUsers,
-      completedTasks,
       levelProgress,
       pointsToNextLevel,
-      claimReward,
-      goToTask,
+      currentLevelName,
       goToRanking
     }
   }
@@ -416,7 +496,7 @@ export default {
 .reward-points {
   font-size: 20px;
   font-weight: bold;
-  color: #67C23A;
+  color: #67c23a;
   margin-bottom: 8px;
 }
 
@@ -442,7 +522,7 @@ export default {
 
 .current-level h2 {
   font-size: 32px;
-  color: #409EFF;
+  color: #409eff;
   margin: 0;
 }
 
@@ -453,7 +533,7 @@ export default {
 }
 
 .highlight {
-  color: #409EFF;
+  color: #409eff;
   font-weight: bold;
   font-size: 18px;
 }
@@ -495,17 +575,17 @@ export default {
 }
 
 .rank-1 {
-  background: linear-gradient(135deg, #FFD700, #FFA500);
+  background: linear-gradient(135deg, #ffd700, #ffa500);
   color: white;
 }
 
 .rank-2 {
-  background: linear-gradient(135deg, #C0C0C0, #808080);
+  background: linear-gradient(135deg, #c0c0c0, #808080);
   color: white;
 }
 
 .rank-3 {
-  background: linear-gradient(135deg, #CD7F32, #8B4513);
+  background: linear-gradient(135deg, #cd7f32, #8b4513);
   color: white;
 }
 

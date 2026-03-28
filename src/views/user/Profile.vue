@@ -101,6 +101,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { getUserStatistics } from '@/api/user'
 
 export default {
   name: 'Profile',
@@ -108,7 +109,7 @@ export default {
     const userStore = useUserStore()
     const formRef = ref(null)
     const loading = ref(false)
-
+    
     const userInfo = reactive({
       id: null,
       username: '',
@@ -127,9 +128,9 @@ export default {
     })
 
     const stats = reactive({
-      articles: 45,
-      videos: 32,
-      posts: 18
+      articles: 0,
+      videos: 0,
+      posts: 0
     })
 
     const rules = {
@@ -146,8 +147,19 @@ export default {
       ]
     }
 
-    const loadUserInfo = () => {
+    const loadUserInfo = async () => {
       Object.assign(userInfo, userStore.userInfo)
+      try {
+        const res = await getUserStatistics()
+        if (res.code === 200 && res.data) {
+          userInfo.points = Number(res.data.points || 0)
+          stats.articles = Number(res.data.articleCount || 0)
+          stats.videos = Number(res.data.videoCount || 0)
+          stats.posts = Number(res.data.topicCount || 0)
+        }
+      } catch (error) {
+        console.error('获取个人统计失败：', error)
+      }
     }
 
     const handleSave = async () => {

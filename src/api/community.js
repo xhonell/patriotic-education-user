@@ -1,74 +1,95 @@
 import request from './request'
 
 /**
- * 每日签到
+ * 今日签到
  */
-export function checkIn() {
+export function signToday() {
   return request({
-    url: '/community/checkin',
-    method: 'post'
-  })
-}
-
-/**
- * 获取签到信息
- */
-export function getCheckInInfo() {
-  return request({
-    url: '/community/checkin/info',
+    url: '/server/sign/today',
     method: 'get'
   })
 }
 
 /**
- * 获取帖子列表
+ * 获取本月签到记录（返回签到日期数组）
  */
-export function getPostList(params) {
+export function signMonth() {
   return request({
-    url: '/community/posts',
-    method: 'get',
-    params
-  })
-}
-
-/**
- * 获取帖子详情
- */
-export function getPostDetail(id) {
-  return request({
-    url: `/community/post/${id}`,
+    url: '/server/sign/month',
     method: 'get'
   })
 }
 
 /**
- * 发表帖子
+ * 话题分页
  */
-export function createPost(data) {
+export function getTopicPage(data) {
   return request({
-    url: '/community/post',
+    url: '/server/topic/page',
     method: 'post',
     data
   })
 }
 
 /**
- * 回复帖子
+ * 话题详情
  */
-export function replyPost(data) {
+export function getTopicDetail(id) {
   return request({
-    url: '/community/reply',
+    url: `/server/topic/${id}`,
+    method: 'get'
+  })
+}
+
+/**
+ * 发布话题
+ */
+export function publishTopic(data) {
+  return request({
+    url: '/server/topic/publish',
     method: 'post',
     data
   })
 }
 
 /**
- * 获取排行榜
+ * 发布话题评论
  */
-export function getRanking(params) {
+export function publishTopicComment(data) {
   return request({
-    url: '/community/ranking',
+    url: '/server/topic/comment/publish',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 删除话题评论
+ */
+export function deleteTopicComment(id) {
+  return request({
+    url: `/server/topic/comment/${id}`,
+    method: 'delete'
+  })
+}
+
+/**
+ * 获取话题评论分页
+ */
+export function getTopicCommentPage(data) {
+  return request({
+    url: '/server/topic/comment/page',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 获取积分排行榜
+ */
+export function getPointsRanking(params) {
+  return request({
+    url: '/server/common/points/ranking',
     method: 'get',
     params
   })
@@ -95,13 +116,12 @@ export function claimTaskReward(taskId) {
 }
 
 /**
- * 获取社区活动
+ * 获取系统最新动态
  */
-export function getCommunityActivities(params) {
+export function getLatestActivities() {
   return request({
-    url: '/community/activities',
-    method: 'get',
-    params
+    url: '/server/common/activities',
+    method: 'get'
   })
 }
 

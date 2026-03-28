@@ -1,6 +1,8 @@
 <template>
   <div class="article-detail-page">
-    <el-card class="article-card">
+    <el-row :gutter="24">
+      <el-col :xs="24" :lg="16">
+        <el-card class="article-card">
       <!-- 文章头部 -->
       <div class="article-header">
         <h1 class="article-title">{{ article.title }}</h1>
@@ -52,10 +54,10 @@
           分享
         </el-button>
       </div>
-    </el-card>
+        </el-card>
 
-    <!-- 评论区 -->
-    <el-card class="comment-card">
+        <!-- 评论区 -->
+        <el-card class="comment-card">
       <template #header>
         <div class="card-header">
           <span>评论区 ({{ commentTotal }})</span>
@@ -107,43 +109,51 @@
       </div>
 
       <el-pagination
-        v-model:current-page="commentPage"
-        v-model:page-size="commentPageSize"
+        :current-page="commentPage"
+        :page-size="commentPageSize"
         :total="commentTotal"
         :page-sizes="[5, 10, 20]"
         layout="total, sizes, prev, pager, next"
+        @update:current-page="(val) => { commentPage = val; fetchComments() }"
+        @update:page-size="(val) => { commentPageSize = val; commentPage = 1; fetchComments() }"
         @size-change="() => { commentPage = 1; fetchComments() }"
         @current-change="fetchComments"
         class="pagination"
         style="margin-top: 16px"
       />
-    </el-card>
+        </el-card>
+      </el-col>
 
-    <!-- 推荐阅读 -->
-    <el-card class="recommend-card">
-      <template #header>
-        <div class="card-header">
-          <span>推荐阅读</span>
-        </div>
-      </template>
-      <div class="recommend-list">
-        <div class="recommend-item" v-for="item in recommendations" :key="item.id" @click="goToArticle(item.id)">
-          <img :src="item.cover" :alt="item.title" @error="handleImageError" />
-          <div class="recommend-info">
-            <h4>{{ item.title }}</h4>
-            <p>{{ item.summary }}</p>
+      <!-- 侧边栏 -->
+      <el-col :xs="24" :lg="8">
+        <el-card class="recommend-card">
+          <template #header>
+            <div class="card-header">
+              <span>推荐阅读</span>
+            </div>
+          </template>
+          <div class="recommend-list">
+            <div class="recommend-item" v-for="item in recommendations" :key="item.id" @click="goToArticle(item.id)">
+              <div class="recommend-cover">
+                <img :src="item.cover" :alt="item.title" @error="handleImageError" />
+              </div>
+              <div class="recommend-info">
+                <h4>{{ item.title }}</h4>
+                <p class="recommend-meta">{{ item.summary }}</p>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </el-card>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getArticleDetail } from '@/api/content'
+import { getArticleDetail, getRecommendList } from '@/api/content'
 import { deleteComment, getCommentPage, publishComment } from '@/api/comment'
 import {
   getInteractionStatus,
@@ -182,26 +192,7 @@ export default {
     const commentPageSize = ref(10)
     const comments = ref([])
 
-    const recommendations = reactive([
-      {
-        id: 2,
-        title: '改革开放四十年的伟大成就',
-        summary: '见证中国改革开放的历史进程',
-        cover: 'https://via.placeholder.com/200x150?text=Recommend+1'
-      },
-      {
-        id: 3,
-        title: '抗美援朝战争中的英雄事迹',
-        summary: '致敬最可爱的人',
-        cover: 'https://via.placeholder.com/200x150?text=Recommend+2'
-      },
-      {
-        id: 4,
-        title: '科技强国之路',
-        summary: '探索中国科技创新的发展历程',
-        cover: 'https://via.placeholder.com/200x150?text=Recommend+3'
-      }
-    ])
+    const recommendations = ref([])
 
     const getCategoryType = (category) => {
       const typeMap = {
@@ -236,7 +227,7 @@ export default {
         article.likes = Math.max(0, article.likes + (operation === 1 ? 1 : -1))
         if (operation === 1) {
           await grantPoints({
-            sourceType: '4',
+            sourceType: 4,
             sourceId: route.params.id,
             remark: '点赞内容',
             points: 5
@@ -258,7 +249,7 @@ export default {
         hasCollected.value = !hasCollected.value
         if (operation === 1) {
           await grantPoints({
-            sourceType: '5',
+            sourceType: 5,
             sourceId: route.params.id,
             remark: '收藏内容',
             points: 5
@@ -376,7 +367,7 @@ export default {
           content
         })
         await grantPoints({
-          sourceType: '3',
+          sourceType: 3,
           sourceId: id,
           remark: '发表评论',
           points: 10
@@ -403,7 +394,28 @@ export default {
     }
 
     const goToArticle = (id) => {
+      if (!id || Number(id) === Number(route.params.id)) return
       router.push(`/article-detail/${id}`)
+    }
+
+    const fetchRecommendations = async () => {
+      try {
+        const res = await getRecommendList()
+        if (res.code === 200 && res.data) {
+          const currentId = Number(route.params.id)
+          recommendations.value = res.data
+            .filter(item => Number(item.type) === 1 && Number(item.id) !== currentId)
+            .slice(0, 6)
+            .map(item => ({
+              id: item.id,
+              title: item.title,
+              summary: item.summary || item.description || item.reason || '推荐阅读',
+              cover: item.fileUrl || item.coverUrl || 'https://via.placeholder.com/200x150?text=Article'
+            }))
+        }
+      } catch (error) {
+        console.error('获取推荐文章失败：', error)
+      }
     }
 
     const handleImageError = (e) => {
@@ -419,21 +431,41 @@ export default {
       if (!id) return
       grantedLearningPoints.value = true
       await grantPoints({
-        sourceType: '1',
+        sourceType: 1,
         sourceId: id,
         remark: '文章学习',
         points: article.learningPoints
       })
     }
 
-    onMounted(() => {
+    const initPageData = () => {
       fetchArticleDetail()
       fetchInteractionStatus()
+      fetchRecommendations()
       fetchComments()
+    }
+
+    onMounted(() => {
+      initPageData()
       articleLearningTimer = setTimeout(() => {
         grantLearningPointsOnce()
       }, 10000)
     })
+
+    watch(
+      () => route.params.id,
+      () => {
+        commentPage.value = 1
+        grantedLearningPoints.value = false
+        initPageData()
+        if (articleLearningTimer) {
+          clearTimeout(articleLearningTimer)
+        }
+        articleLearningTimer = setTimeout(() => {
+          grantLearningPointsOnce()
+        }, 10000)
+      }
+    )
 
     onBeforeUnmount(() => {
       if (articleLearningTimer) {
@@ -470,7 +502,7 @@ export default {
 
 <style scoped>
 .article-detail-page {
-  max-width: 1000px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -661,44 +693,54 @@ export default {
 }
 
 .recommend-item {
-  display: flex;
-  gap: 16px;
-  padding: 12px;
-  border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s;
 }
 
 .recommend-item:hover {
-  background: #f5f5f5;
+  opacity: 0.8;
 }
 
-.recommend-item img {
-  width: 120px;
-  height: 90px;
-  object-fit: cover;
+.recommend-cover {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  margin-bottom: 8px;
   border-radius: 8px;
-  flex-shrink: 0;
+  overflow: hidden;
 }
 
-.recommend-info {
-  flex: 1;
+.recommend-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .recommend-info h4 {
-  font-size: 16px;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.recommend-info p {
   font-size: 14px;
-  color: #666;
+  color: #333;
+  margin-bottom: 6px;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
+}
+
+.recommend-meta {
+  font-size: 12px;
+  color: #999;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+@media (max-width: 992px) {
+  .recommend-card {
+    margin-top: 24px;
+  }
 }
 
 @media (max-width: 768px) {

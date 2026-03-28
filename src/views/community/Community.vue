@@ -3,8 +3,8 @@
     <h1 class="page-title">社区交流</h1>
 
     <!-- 功能入口 -->
-    <el-row :gutter="20" class="feature-cards">
-      <el-col :xs="12" :sm="6" v-for="feature in features" :key="feature.id">
+    <el-row justify="center" class="feature-cards">
+      <el-col :xs="24" :sm="8" :md="7" :lg="6" class="feature-col" v-for="feature in features" :key="feature.id">
         <el-card class="feature-card" @click="goToFeature(feature.path)">
           <div class="feature-content">
             <el-icon :size="48" :color="feature.color">
@@ -52,7 +52,7 @@
 
     <!-- 最新动态 -->
     <el-row :gutter="20">
-      <el-col :xs="24" :lg="16">
+      <el-col :xs="24" :lg="24">
         <el-card class="activities-card">
           <template #header>
             <div class="card-header">
@@ -73,8 +73,7 @@
                   </el-avatar>
                   <div class="activity-text">
                     <span class="username">{{ activity.user.name }}</span>
-                    {{ activity.action }}
-                    <span class="target">《{{ activity.target }}》</span>
+                    {{ activity.description }}
                   </div>
                 </div>
               </el-card>
@@ -82,46 +81,14 @@
           </el-timeline>
         </el-card>
       </el-col>
-
-      <!-- 社区公告 -->
-      <el-col :xs="24" :lg="8">
-        <el-card class="announcement-card">
-          <template #header>
-            <div class="card-header">
-              <span>📢 社区公告</span>
-            </div>
-          </template>
-          <div class="announcement-list">
-            <div class="announcement-item" v-for="item in announcements" :key="item.id">
-              <el-tag :type="item.type" size="small">{{ item.tag }}</el-tag>
-              <h4>{{ item.title }}</h4>
-              <p>{{ item.date }}</p>
-            </div>
-          </div>
-        </el-card>
-
-        <!-- 社区数据 -->
-        <el-card class="stats-card">
-          <template #header>
-            <div class="card-header">
-              <span>社区数据</span>
-            </div>
-          </template>
-          <div class="stats-list">
-            <div class="stat-item" v-for="stat in communityStats" :key="stat.label">
-              <div class="stat-label">{{ stat.label }}</div>
-              <div class="stat-value">{{ stat.value }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
     </el-row>
   </div>
 </template>
 
 <script>
-import { reactive } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { getTopicPage, getLatestActivities } from '@/api/community'
 
 export default {
   name: 'Community',
@@ -139,18 +106,10 @@ export default {
       },
       {
         id: 2,
-        title: '论坛模块',
+        title: '话题模块',
         description: '交流学习心得',
         icon: 'ChatDotRound',
         color: '#67C23A',
-        path: '/forum'
-      },
-      {
-        id: 3,
-        title: '话题模块',
-        description: '参与热门讨论',
-        icon: 'Comment',
-        color: '#E6A23C',
         path: '/forum'
       },
       {
@@ -163,66 +122,9 @@ export default {
       }
     ])
 
-    const hotTopics = reactive([
-      {
-        id: 1,
-        title: '学习《改革开放四十年》纪录片的心得体会',
-        author: { name: '爱国青年', avatar: 'https://via.placeholder.com/100' },
-        date: '2小时前',
-        views: 580,
-        replies: 45,
-        likes: 89
-      },
-      {
-        id: 2,
-        title: '分享我的学习计划：如何系统学习爱国主义教育内容',
-        author: { name: '学习之星', avatar: 'https://via.placeholder.com/100' },
-        date: '5小时前',
-        views: 420,
-        replies: 32,
-        likes: 67
-      },
-      {
-        id: 3,
-        title: '讨论：新时代青年如何传承爱国主义精神',
-        author: { name: '追梦人', avatar: 'https://via.placeholder.com/100' },
-        date: '1天前',
-        views: 1200,
-        replies: 98,
-        likes: 156
-      }
-    ])
+    const hotTopics = ref([])
 
-    const activities = reactive([
-      {
-        id: 1,
-        user: { name: '小明', avatar: 'https://via.placeholder.com/100' },
-        action: '发表了评论在文章',
-        target: '新中国成立的伟大历程',
-        time: '10分钟前'
-      },
-      {
-        id: 2,
-        user: { name: '小红', avatar: 'https://via.placeholder.com/100' },
-        action: '完成了视频学习',
-        target: '改革开放四十年',
-        time: '30分钟前'
-      },
-      {
-        id: 3,
-        user: { name: '小华', avatar: 'https://via.placeholder.com/100' },
-        action: '发布了新话题',
-        target: '学习心得分享',
-        time: '1小时前'
-      },
-      {
-        id: 4,
-        user: { name: '小强', avatar: 'https://via.placeholder.com/100' },
-        action: '完成了每日签到',
-        target: '连续签到第7天',
-        time: '2小时前'
-      }
-    ])
+    const activities = ref([])
 
     const announcements = reactive([
       {
@@ -255,6 +157,59 @@ export default {
       { label: '评论总数', value: '50,000+' }
     ])
 
+    const loadHotTopics = async () => {
+      try {
+        const res = await getTopicPage({
+          page: 1,
+          pageSize: 3,
+          orderBy: 'view_count',
+          orderType: 'DESC'
+        })
+        if (res.code === 200 && res.data) {
+          hotTopics.value = (res.data.list || []).map(item => ({
+            id: item.id,
+            title: item.title,
+            author: {
+              name: item.userName || '匿名用户',
+              avatar: item.avatarUrl || 'https://via.placeholder.com/100'
+            },
+            date: item.createTime || '',
+            views: item.viewCount || 0,
+            replies: item.replyCount || 0,
+            likes: item.likeCount || 0
+          }))
+        }
+      } catch (error) {
+        console.error('获取热门话题失败：', error)
+      }
+    }
+
+    const formatActivityTime = (value) => {
+      if (!value) return ''
+      if (typeof value === 'string') return value.replace('T', ' ')
+      if (value instanceof Date) return value.toLocaleString('zh-CN')
+      return String(value)
+    }
+
+    const loadLatestActivities = async () => {
+      try {
+        const res = await getLatestActivities()
+        if (res.code === 200 && Array.isArray(res.data)) {
+          activities.value = res.data.map((item, index) => ({
+            id: index + 1,
+            user: {
+              name: item.userName || '匿名用户',
+              avatar: item.avatarUrl || 'https://via.placeholder.com/100'
+            },
+            description: item.description || '',
+            time: formatActivityTime(item.createTime)
+          }))
+        }
+      } catch (error) {
+        console.error('获取最新动态失败：', error)
+      }
+    }
+
     const goToFeature = (path) => {
       router.push(path)
     }
@@ -266,6 +221,11 @@ export default {
     const goToTopic = (id) => {
       router.push(`/topic/${id}`)
     }
+
+    onMounted(() => {
+      loadHotTopics()
+      loadLatestActivities()
+    })
 
     return {
       features,
@@ -289,6 +249,11 @@ export default {
 
 .feature-cards {
   margin-bottom: 24px;
+}
+
+.feature-col {
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .feature-card {

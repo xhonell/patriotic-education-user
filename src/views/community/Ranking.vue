@@ -2,15 +2,6 @@
   <div class="ranking-page">
     <h1 class="page-title">社区等级排行榜</h1>
 
-    <!-- 排行榜类型切换 -->
-    <el-card class="tabs-card" :body-style="{ padding: '20px' }">
-      <el-radio-group v-model="activeTab" size="large" @change="handleTabChange">
-        <el-radio-button label="points">积分排行</el-radio-button>
-        <el-radio-button label="checkin">签到排行</el-radio-button>
-        <el-radio-button label="learning">学习排行</el-radio-button>
-        <el-radio-button label="contribution">贡献排行</el-radio-button>
-      </el-radio-group>
-    </el-card>
 
     <el-row :gutter="20">
       <!-- 排行榜主体 -->
@@ -23,11 +14,11 @@
               <div class="rank-badge">
                 <img src="https://via.placeholder.com/100x100?text=2" alt="第二名" class="badge-img" />
               </div>
-              <el-avatar :src="topUsers[1].avatar" :size="80">
+              <el-avatar :src="topThreeUsers[1].avatar" :size="80">
                 <el-icon><User /></el-icon>
               </el-avatar>
-              <h3>{{ topUsers[1].username }}</h3>
-              <div class="rank-score">{{ getRankValue(topUsers[1]) }}</div>
+              <h3>{{ topThreeUsers[1].userName }} <el-tag v-if="topThreeUsers[1].isMe" size="small" type="danger">本人</el-tag></h3>
+              <div class="rank-score">{{ getRankValue(topThreeUsers[1]) }}</div>
             </div>
 
             <!-- 第一名 -->
@@ -35,11 +26,11 @@
               <div class="rank-badge">
                 <img src="https://via.placeholder.com/120x120?text=1" alt="第一名" class="badge-img" />
               </div>
-              <el-avatar :src="topUsers[0].avatar" :size="100">
+              <el-avatar :src="topThreeUsers[0].avatar" :size="100">
                 <el-icon><User /></el-icon>
               </el-avatar>
-              <h3>{{ topUsers[0].username }}</h3>
-              <div class="rank-score">{{ getRankValue(topUsers[0]) }}</div>
+              <h3>{{ topThreeUsers[0].userName }} <el-tag v-if="topThreeUsers[0].isMe" size="small" type="danger">本人</el-tag></h3>
+              <div class="rank-score">{{ getRankValue(topThreeUsers[0]) }}</div>
             </div>
 
             <!-- 第三名 -->
@@ -47,11 +38,11 @@
               <div class="rank-badge">
                 <img src="https://via.placeholder.com/100x100?text=3" alt="第三名" class="badge-img" />
               </div>
-              <el-avatar :src="topUsers[2].avatar" :size="80">
+              <el-avatar :src="topThreeUsers[2].avatar" :size="80">
                 <el-icon><User /></el-icon>
               </el-avatar>
-              <h3>{{ topUsers[2].username }}</h3>
-              <div class="rank-score">{{ getRankValue(topUsers[2]) }}</div>
+              <h3>{{ topThreeUsers[2].userName }} <el-tag v-if="topThreeUsers[2].isMe" size="small" type="danger">本人</el-tag></h3>
+              <div class="rank-score">{{ getRankValue(topThreeUsers[2]) }}</div>
             </div>
           </div>
         </el-card>
@@ -59,16 +50,16 @@
         <!-- 排行榜列表 -->
         <el-card class="ranking-list-card">
           <div class="ranking-list">
-            <div class="ranking-item" v-for="(user, index) in rankedUsers" :key="user.id">
-              <div class="rank-number" :class="getRankClass(index + 4)">
-                {{ index + 4 }}
+            <div class="ranking-item" v-for="user in rankedUsers" :key="user.userId || user.ranking">
+              <div class="rank-number" :class="getRankClass(user.ranking)">
+                {{ user.ranking }}
               </div>
               <el-avatar :src="user.avatar" :size="48">
                 <el-icon><User /></el-icon>
               </el-avatar>
               <div class="user-info">
-                <div class="user-name">{{ user.username }}</div>
-                <div class="user-level">Lv.{{ user.level }}</div>
+                <div class="user-name">{{ user.userName }} <el-tag v-if="user.isMe" size="small" type="danger">本人</el-tag></div>
+                <div class="user-level">Lv.{{ calcLevel(user.points) }} {{ getLevelName(calcLevel(user.points)) }}</div>
               </div>
               <div class="user-score">
                 <span class="score-value">{{ getRankValue(user) }}</span>
@@ -76,6 +67,16 @@
               </div>
             </div>
           </div>
+        </el-card>
+
+        <el-card class="ranking-list-card">
+          <el-pagination
+            :current-page="page"
+            :page-size="pageSize"
+            :total="total"
+            layout="total, prev, pager, next"
+            @current-change="handlePageChange"
+          />
         </el-card>
       </el-col>
 
@@ -100,7 +101,7 @@
                 <div class="stat-label">积分</div>
               </div>
               <div class="stat-item">
-                <div class="stat-value">Lv.{{ myStats.level }}</div>
+                <div class="stat-value">Lv.{{ myStats.level }} {{ getLevelName(myStats.level) }}</div>
                 <div class="stat-label">等级</div>
               </div>
             </div>
@@ -110,7 +111,8 @@
               :text-inside="true"
               class="level-progress"
             />
-            <p class="progress-tip">
+            <p class="progress-tip" v-if="myRank === 1">已是第一名，继续保持！</p>
+            <p class="progress-tip" v-else>
               再获得 <span class="highlight">{{ pointsToNextRank }}</span> 积分可超越前一名
             </p>
           </div>
@@ -160,106 +162,29 @@
 </template>
 
 <script>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useUserStore } from '@/stores/user'
+import { getPointsRanking } from '@/api/points'
 
 export default {
   name: 'Ranking',
   setup() {
-    const activeTab = ref('points')
-    const myRank = ref(128)
+    const myRank = ref('--')
+    const page = ref(1)
+    const pageSize = ref(10)
+    const total = ref(0)
 
     const myStats = reactive({
-      points: 1250,
-      level: 5
+      points: 0,
+      level: 1
     })
 
-    const topUsers = reactive([
-      {
-        id: 1,
-        username: '学习之星',
-        avatar: 'https://via.placeholder.com/100',
-        points: 5280,
-        checkinDays: 365,
-        learningHours: 520,
-        contribution: 890,
-        level: 12
-      },
-      {
-        id: 2,
-        username: '爱国青年',
-        avatar: 'https://via.placeholder.com/100',
-        points: 4650,
-        checkinDays: 280,
-        learningHours: 450,
-        contribution: 780,
-        level: 11
-      },
-      {
-        id: 3,
-        username: '奋斗者',
-        avatar: 'https://via.placeholder.com/100',
-        points: 3920,
-        checkinDays: 210,
-        learningHours: 380,
-        contribution: 650,
-        level: 10
-      }
-    ])
+    const userStore = useUserStore()
 
-    const rankedUsers = reactive([
-      {
-        id: 4,
-        username: '追梦人',
-        avatar: 'https://via.placeholder.com/100',
-        points: 3540,
-        checkinDays: 180,
-        learningHours: 340,
-        contribution: 580,
-        level: 9
-      },
-      {
-        id: 5,
-        username: '知识达人',
-        avatar: 'https://via.placeholder.com/100',
-        points: 3280,
-        checkinDays: 156,
-        learningHours: 310,
-        contribution: 520,
-        level: 9
-      },
-      {
-        id: 6,
-        username: '勤奋小蜜蜂',
-        avatar: 'https://via.placeholder.com/100',
-        points: 2950,
-        checkinDays: 145,
-        learningHours: 280,
-        contribution: 480,
-        level: 8
-      },
-      {
-        id: 7,
-        username: '学习标兵',
-        avatar: 'https://via.placeholder.com/100',
-        points: 2680,
-        checkinDays: 132,
-        learningHours: 250,
-        contribution: 450,
-        level: 8
-      },
-      {
-        id: 8,
-        username: '进步青年',
-        avatar: 'https://via.placeholder.com/100',
-        points: 2420,
-        checkinDays: 120,
-        learningHours: 220,
-        contribution: 410,
-        level: 7
-      }
-    ])
+    const topUsers = ref([])
+    const rankedUsers = ref([])
 
-    const levels = reactive([
+    const levelConfigs = [
       { level: 1, name: '新手', points: 0, color: '#909399' },
       { level: 2, name: '入门', points: 100, color: '#909399' },
       { level: 3, name: '进阶', points: 300, color: '#67C23A' },
@@ -270,68 +195,117 @@ export default {
       { level: 8, name: '宗师', points: 3000, color: '#E6A23C' },
       { level: 9, name: '传说', points: 4000, color: '#F56C6C' },
       { level: 10, name: '神话', points: 5000, color: '#F56C6C' }
-    ])
+    ]
+
+    const calcLevel = (points = 0) => {
+      const value = Number(points || 0)
+      let level = 1
+      levelConfigs.forEach(item => {
+        if (value >= item.points) {
+          level = item.level
+        }
+      })
+      return level
+    }
+
+    const getLevelName = (level) => {
+      return levelConfigs.find(item => item.level === level)?.name || '新手'
+    }
+
+    const topThreeUsers = computed(() => {
+      const fallback = { userName: '-', avatar: '', points: 0, isMe: false }
+      return [topUsers.value[0] || fallback, topUsers.value[1] || fallback, topUsers.value[2] || fallback]
+    })
+
+    const levels = reactive(levelConfigs.map(item => ({ ...item })))
 
     const levelProgress = computed(() => {
-      return Math.floor((myStats.points % 500) / 5)
+      const currentLevel = calcLevel(myStats.points)
+      const currentStart = levels[currentLevel - 1]?.points ?? 0
+      const nextStart = levels[currentLevel]?.points ?? (currentStart + 1000)
+      const span = Math.max(1, nextStart - currentStart)
+      const progressed = Math.max(0, myStats.points - currentStart)
+      return Math.min(100, Math.floor((progressed / span) * 100))
     })
+
+    const loadRanking = async () => {
+      try {
+        const res = await getPointsRanking({ page: page.value, pageSize: pageSize.value })
+        if (res.code === 200 && res.data) {
+          const pageData = res.data
+          const list = pageData.list || pageData.records || []
+          total.value = Number(pageData.total || list.length || 0)
+
+          const mapped = list.map(item => ({
+            ranking: item.ranking,
+            userId: item.userId,
+            userName: item.userName || '匿名用户',
+            avatar: item.avatarUrl || 'https://via.placeholder.com/100',
+            points: Number(item.points || 0),
+            isMe: Number(item.userId) === Number(userStore.userInfo?.id)
+          }))
+
+          topUsers.value = mapped.slice(0, 3)
+          rankedUsers.value = mapped.filter(item => Number(item.ranking) > 3)
+
+          const me = mapped.find(item => item.isMe)
+          if (me) {
+            myRank.value = me.ranking
+            myStats.points = me.points
+            myStats.level = calcLevel(me.points)
+          }
+        }
+      } catch (error) {
+        console.error('获取积分排行榜失败：', error)
+      }
+    }
+
+    const handlePageChange = (val) => {
+      page.value = val
+      loadRanking()
+    }
 
     const pointsToNextRank = computed(() => {
-      return 150 // 模拟数据
+      const rankValue = Number(myRank.value)
+      if (!rankValue || rankValue <= 1) return 0
+      const me = [...topUsers.value, ...rankedUsers.value].find(item => item.isMe)
+      if (!me) return 0
+      const above = [...topUsers.value, ...rankedUsers.value].find(item => Number(item.ranking) === rankValue - 1)
+      if (!above) return 0
+      return Math.max(0, Number(above.points || 0) - Number(me.points || 0) + 1)
     })
 
-    const getRankValue = (user) => {
-      switch (activeTab.value) {
-        case 'points':
-          return user.points
-        case 'checkin':
-          return user.checkinDays + '天'
-        case 'learning':
-          return user.learningHours + '小时'
-        case 'contribution':
-          return user.contribution
-        default:
-          return user.points
-      }
-    }
+    const getRankValue = (user) => user.points
 
-    const getRankLabel = () => {
-      switch (activeTab.value) {
-        case 'points':
-          return '积分'
-        case 'checkin':
-          return '签到'
-        case 'learning':
-          return '学习'
-        case 'contribution':
-          return '贡献'
-        default:
-          return '积分'
-      }
-    }
+    const getRankLabel = () => '积分'
 
     const getRankClass = (rank) => {
       if (rank <= 10) return 'top-10'
       return ''
     }
 
-    const handleTabChange = () => {
-      console.log('切换排行榜类型', activeTab.value)
-    }
+    onMounted(() => {
+      loadRanking()
+    })
 
     return {
-      activeTab,
       myRank,
       myStats,
       topUsers,
+      topThreeUsers,
       rankedUsers,
+      page,
+      pageSize,
+      total,
       levels,
       levelProgress,
       pointsToNextRank,
       getRankValue,
       getRankLabel,
       getRankClass,
-      handleTabChange
+      calcLevel,
+      getLevelName,
+      handlePageChange
     }
   }
 }
@@ -343,10 +317,6 @@ export default {
   margin: 0 auto;
 }
 
-.tabs-card {
-  margin-bottom: 24px;
-  text-align: center;
-}
 
 .top-three-card {
   margin-bottom: 24px;

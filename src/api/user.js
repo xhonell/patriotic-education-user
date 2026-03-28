@@ -57,22 +57,22 @@ export function updateUserInfo(data) {
 /**
  * 获取学习历史
  */
-export function getLearningHistory(params) {
+export function getLearningHistory(data) {
   return request({
-    url: '/user/learning/history',
-    method: 'get',
-    params
+    url: '/server/common/learning/history',
+    method: 'post',
+    data
   })
 }
 
 /**
  * 获取积分明细
  */
-export function getPointsHistory(params) {
+export function getPointsHistory(data) {
   return request({
-    url: '/user/points/history',
-    method: 'get',
-    params
+    url: '/server/common/points/detail',
+    method: 'post',
+    data
   })
 }
 
@@ -102,6 +102,16 @@ export function uploadFile(file) {
     headers: {
       'Content-Type': 'multipart/form-data'
     }
+  })
+}
+
+/**
+ * 获取个人统计
+ */
+export function getUserStatistics() {
+  return request({
+    url: '/server/common/user/statistics',
+    method: 'get'
   })
 }
 

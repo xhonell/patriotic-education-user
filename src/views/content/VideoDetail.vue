@@ -169,7 +169,7 @@
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getVideoDetailById, getRecommendVideos } from '@/api/content'
+import { getVideoDetailById, getRecommendList } from '@/api/content'
 import { deleteComment, getCommentPage, publishComment } from '@/api/comment'
 import {
   getInteractionStatus,
@@ -428,11 +428,11 @@ export default {
 
     const fetchRecommendations = async () => {
       try {
-        const res = await getRecommendVideos()
+        const res = await getRecommendList()
         if (res.code === 200 && res.data) {
           const currentId = Number(route.params.id)
           recommendations.value = res.data
-            .filter(item => item.id !== currentId)
+            .filter(item => item.type === 2 && item.id !== currentId)
             .slice(0, 6)
             .map(item => ({
               id: item.id,

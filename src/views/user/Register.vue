@@ -156,6 +156,23 @@
           />
         </el-form-item>
 
+        <el-form-item prop="birthday">
+          <div class="input-label">
+            <el-icon><Calendar /></el-icon>
+            生日
+          </div>
+          <el-date-picker
+            v-model="registerForm.birthday"
+            type="date"
+            placeholder="请选择生日"
+            size="large"
+            class="custom-input"
+            style="width: 100%"
+            value-format="YYYY-MM-DD"
+            format="YYYY-MM-DD"
+          />
+        </el-form-item>
+
         <el-form-item prop="code">
           <div class="input-label">
             <el-icon><ChatLineSquare /></el-icon>
@@ -290,6 +307,7 @@ export default {
       username: '',
       email: '',
       phone: '',
+      birthday: '',
       code: '',
       password: '',
       confirmPassword: '',
@@ -318,6 +336,9 @@ export default {
       phone: [
         { required: true, message: '请输入手机号', trigger: 'blur' },
         { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+      ],
+      birthday: [
+        { required: true, message: '请选择生日', trigger: 'change' }
       ],
       code: [
         { required: true, message: '请输入验证码', trigger: 'blur' }
@@ -392,6 +413,9 @@ export default {
               username: registerForm.username,
               email: registerForm.email,
               phone: registerForm.phone,
+              birthday: registerForm.birthday
+                ? String(registerForm.birthday).split(' ')[0]
+                : '',
               code: registerForm.code,
               password: registerForm.password
             }
