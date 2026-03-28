@@ -73,6 +73,36 @@
           @current-change="handlePointsPageChange"
         />
       </el-tab-pane>
+
+      <el-tab-pane label="答题记录" name="examRecords">
+        <el-table :data="examRecords" style="width: 100%">
+          <el-table-column prop="paperTitle" label="试卷" min-width="200" />
+          <el-table-column prop="score" label="得分" width="100" />
+          <el-table-column prop="correctCount" label="正确题数" width="110" />
+          <el-table-column prop="answerCount" label="答题总数" width="110" />
+          <el-table-column label="是否及格" width="100">
+            <template #default="{ row }">
+              <el-tag :type="Number(row.passStatus) === 1 ? 'success' : 'danger'">
+                {{ Number(row.passStatus) === 1 ? '及格' : '不及格' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="submitTime" label="提交时间" width="180" />
+          <el-table-column label="操作" width="120">
+            <template #default="{ row }">
+              <el-button type="primary" link @click="goExamRecordDetail(row.id)">查看详情</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-pagination
+          class="table-pagination"
+          :current-page="examPage"
+          :page-size="examPageSize"
+          :total="examTotal"
+          layout="total, prev, pager, next"
+          @current-change="handleExamPageChange"
+        />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -81,6 +111,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getPointsHistory, getLearningHistory, getUserStatistics } from '@/api/user'
+import { getMyExamRecords } from '@/api/exam'
 
 export default {
   name: 'LearningInfo',
@@ -104,6 +135,11 @@ export default {
     const pointsPage = ref(1)
     const pointsPageSize = ref(10)
     const pointsTotal = ref(0)
+
+    const examRecords = ref([])
+    const examPage = ref(1)
+    const examPageSize = ref(10)
+    const examTotal = ref(0)
 
     const progressColor = (percentage) => {
       if (percentage < 30) return '#F56C6C'
@@ -183,6 +219,33 @@ export default {
       loadPointsHistory()
     }
 
+    const loadExamRecords = async () => {
+      try {
+        const res = await getMyExamRecords({
+          page: examPage.value,
+          pageSize: examPageSize.value
+        })
+        if (res.code === 200 && res.data) {
+          const pageData = res.data
+          const list = pageData.list || pageData.records || []
+          examTotal.value = Number(pageData.total || list.length || 0)
+          examRecords.value = list
+        }
+      } catch (error) {
+        console.error('获取答题记录失败：', error)
+      }
+    }
+
+    const handleExamPageChange = (page) => {
+      examPage.value = page
+      loadExamRecords()
+    }
+
+    const goExamRecordDetail = (id) => {
+      if (!id) return
+      router.push(`/exam/record/${id}`)
+    }
+
     const continueLearn = (row) => {
       const targetId = row.sourceId || row.id
       if (!targetId) return
@@ -197,6 +260,7 @@ export default {
       loadUserStatistics()
       loadLearningHistory()
       loadPointsHistory()
+      loadExamRecords()
     })
 
     return {
@@ -210,10 +274,16 @@ export default {
       pointsPage,
       pointsPageSize,
       pointsTotal,
+      examRecords,
+      examPage,
+      examPageSize,
+      examTotal,
       progressColor,
       continueLearn,
       handleLearningPageChange,
-      handlePointsPageChange
+      handlePointsPageChange,
+      handleExamPageChange,
+      goExamRecordDetail
     }
   }
 }

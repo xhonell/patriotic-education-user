@@ -103,6 +103,36 @@ const routes = [
         name: 'Ranking',
         component: () => import('@/views/community/Ranking.vue'),
         meta: { title: '社区等级' }
+      },
+      {
+        path: 'exam/list',
+        name: 'ExamList',
+        component: () => import('@/views/exam/ExamList.vue'),
+        meta: { title: '在线考试' }
+      },
+      {
+        path: 'exam/paper/:paperId',
+        name: 'ExamPaper',
+        component: () => import('@/views/exam/ExamPaper.vue'),
+        meta: { title: '试卷答题', requiresAuth: true }
+      },
+      {
+        path: 'exam/records',
+        name: 'ExamRecords',
+        component: () => import('@/views/exam/ExamRecords.vue'),
+        meta: { title: '我的考试记录', requiresAuth: true }
+      },
+      {
+        path: 'exam/record/:recordId',
+        name: 'ExamRecordDetail',
+        component: () => import('@/views/exam/ExamRecordDetail.vue'),
+        meta: { title: '答卷详情', requiresAuth: true }
+      },
+      {
+        path: 'exam/wrong-questions',
+        name: 'ExamWrongQuestions',
+        component: () => import('@/views/exam/ExamWrongQuestions.vue'),
+        meta: { title: '错题本', requiresAuth: true }
       }
     ]
   }

@@ -14,6 +14,7 @@
           <router-link to="/video-learning" class="nav-item">视频学习</router-link>
           <router-link to="/integration" class="nav-item">积分积累</router-link>
           <router-link to="/community" class="nav-item">社区交流</router-link>
+          <router-link to="/exam/list" class="nav-item">考试</router-link>
         </nav>
 
         <div class="navbar-user">
